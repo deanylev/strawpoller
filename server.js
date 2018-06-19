@@ -80,6 +80,12 @@ io.on('connection', (socket) => {
     id: socket.id,
     clientIp
   });
+  socket.on('disconnect', () => {
+    console.log('client disconnected', {
+      id: socket.id,
+      clientIp
+    });
+  });
   const getPollData = (id) => {
     return new Promise((resolve, reject) => {
       query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
