@@ -7,8 +7,14 @@ const Router = EmberRouter.extend({
 });
 
 Router.map(function() {
+  this.route('create', {
+    path: '/'
+  });
   this.route('view', {
     path: '/view/:poll_id'
+  });
+  this.route('edit', {
+    path: '/edit/:poll_id'
   });
 });
 

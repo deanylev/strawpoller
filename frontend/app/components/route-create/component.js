@@ -7,7 +7,10 @@ export default Component.extend({
   socket: null,
   socketConnected: false,
   socketDisconnected: Ember.computed.not('socketConnected'),
+
   topic: '',
+  allowEditing: false,
+  editPassword: '',
   options: null,
   disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'socketConnected', function() {
     return !(this.get('topic') && this.get('options').filter((option) => option.name).length >= 2 && this.get('socketConnected'));
@@ -21,7 +24,6 @@ export default Component.extend({
 
     this.get('socket').on('connect', () => this.set('socketConnected', true));
     this.get('socket').on('disconnect', () => this.set('socketConnected', false));
-    this.get('socket').on('poll created', (id) => this.get('router').transitionTo('view', id));
   },
 
   willDestroy() {
@@ -42,9 +44,20 @@ export default Component.extend({
     },
 
     createPoll() {
-      this.get('socket').emit('create poll', {
-        topic: this.get('topic'),
-        options: this.get('options').filter((option) => option.name)
+      return new Ember.RSVP.Promise((resolve, reject) => {
+        this.get('socket').emit('create poll', {
+          topic: this.get('topic'),
+          options: this.get('options').filter((option) => option.name),
+          allow_editing: this.get('allowEditing') ? 1 : 0,
+          edit_password: this.get('editPassword')
+        }, (success, id) => {
+          if (success) {
+            this.get('router').transitionTo('view', id);
+            resolve();
+          } else {
+            reject();
+          }
+        });
       });
     }
   }

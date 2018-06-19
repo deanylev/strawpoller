@@ -2,6 +2,7 @@
 const express = require('express');
 const uuidv4 = require('uuid/v4');
 const mysql = require('mysql');
+const md5 = require('md5');
 
 // globals
 const PORT = process.env.PORT || 8080;
@@ -55,7 +56,10 @@ app.use(express.static('public'));
   id varchar(36) NOT NULL, \
   created_at bigint(13) NOT NULL, \
   updated_at bigint(13) NOT NULL, \
+  ip_address varchar(45) NOT NULL, \
   topic mediumtext NOT NULL, \
+  allow_editing tinyint(1) NOT NULL, \
+  edit_password varchar(32) NOT NULL, \
   PRIMARY KEY (id), \
   UNIQUE KEY id_UNIQUE (id) \
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
@@ -74,16 +78,27 @@ app.use(express.static('public'));
 
 http.listen(PORT, () => console.log('listening on port', PORT));
 
+const UNLOCKED = {};
+
 io.on('connection', (socket) => {
   const clientIp = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
+  const socketId = socket.id;
   console.log('client connected', {
-    id: socket.id,
+    id: socketId,
     clientIp
   });
   socket.on('disconnect', () => {
     console.log('client disconnected', {
-      id: socket.id,
+      id: socketId,
       clientIp
+    });
+
+    // revoke edit permissions from any polls,
+    // for extra peace of mind
+    Object.keys(UNLOCKED).forEach((id) => {
+      if (UNLOCKED[id] === socketId) {
+        UNLOCKED[id] = null;
+      }
     });
   });
   const getPollData = (id) => {
@@ -125,24 +140,64 @@ io.on('connection', (socket) => {
       });
     });
   };
-  socket.on('create poll', (data) => {
+  socket.on('create poll', (data, callback) => {
     const pollId = uuidv4();
     query('INSERT INTO polls SET ?', {
       id: pollId,
       created_at: Date.now(),
       updated_at: Date.now(),
-      topic: data.topic
+      ip_address: clientIp,
+      topic: data.topic,
+      allow_editing: data.allow_editing || false,
+      edit_password: md5(data.edit_password || uuidv4())
     }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
       id: uuidv4(),
       created_at: Date.now(),
       updated_at: Date.now(),
       poll_id: pollId,
       name: option.name
-    }))).then(() => socket.emit('poll created', pollId));
+    }))).then(() => callback(true, pollId));
   });
 
   socket.on('view poll', (id) => {
     getPollData(id).then((pollData) => socket.join(id, () => socket.emit('poll data', pollData)));
+  });
+
+  socket.on('edit poll', (id, callback) => {
+    getPollData(id).then(callback);
+  });
+
+  socket.on('unlock poll', (data, callback) => {
+    query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
+      if (polls[0].allow_editing && polls[0].edit_password === md5(data.password)) {
+        UNLOCKED[data.id] = socketId;
+        callback(true);
+      } else {
+        callback(false);
+      }
+    });
+  });
+
+  socket.on('save poll', (data, callback) => {
+    const promises = [];
+    if (UNLOCKED[data.id] === socketId) {
+      query('UPDATE polls SET ? WHERE id = ?', [{
+        updated_at: Date.now(),
+        topic: data.topic
+      }, data.id])
+        .then(() => data.options.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{
+          updated_at: Date.now(),
+          name: option.name
+        }, option.id]))))
+        .then(() => Promise.all(promises))
+        .then(() => getPollData(data.id))
+        .then((pollData) => {
+          io.to(data.id).emit('poll data', pollData);
+          callback(true);
+        });
+    } else {
+      callback(false);
+    }
   });
 
   socket.on('add vote', (optionId) => {
