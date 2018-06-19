@@ -1,0 +1,23 @@
+<div class="container text-center">
+  <br>
+  <h1>Strawpoller</h1>
+  <form>
+    <div class="form-group">
+      {{textarea class="form-control" value=topic placeholder="Enter a topic"}}
+    </div>
+    {{#if options}}
+      <h2>Options</h2>
+      {{#each options as |option index|}}
+        <div class="form-group">
+          {{input class="form-control" value=option.name placeholder="Enter an option"}}
+          <br>
+          <button class="btn btn-danger" {{action "removeOption" index}}>Delete</button>
+        </div>
+      {{/each}}
+    {{/if}}
+    <br>
+    <button class="btn btn-primary" {{action "addOption"}}>+ Add Option</button>
+    <br><br>
+    {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "createPoll") disabled=disabled}}Create{{/spin-button}}
+  </form>
+</div>
