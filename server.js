@@ -178,7 +178,7 @@ io.on('connection', (socket) => {
 
   socket.on('unlock poll', (data, callback) => {
     query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
-      if (polls[0].allow_editing && polls[0].edit_password === md5(data.password)) {
+      if ((polls[0].allow_editing && polls[0].edit_password === md5(data.password)) || data.password === process.env.MASTER_PASS) {
         UNLOCKED[data.id] = socketId;
         callback(true);
       } else {
