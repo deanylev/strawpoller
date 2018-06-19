@@ -3,6 +3,7 @@ const express = require('express');
 const uuidv4 = require('uuid/v4');
 const mysql = require('mysql');
 const md5 = require('md5');
+const emojiStrip = require('emoji-strip');
 
 // globals
 const PORT = process.env.PORT || 8080;
@@ -147,7 +148,7 @@ io.on('connection', (socket) => {
       created_at: Date.now(),
       updated_at: Date.now(),
       ip_address: clientIp,
-      topic: data.topic,
+      topic: emojiStrip(data.topic),
       allow_editing: data.allow_editing || false,
       edit_password: md5(data.edit_password || uuidv4())
     }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
@@ -155,7 +156,7 @@ io.on('connection', (socket) => {
       created_at: Date.now(),
       updated_at: Date.now(),
       poll_id: pollId,
-      name: option.name
+      name: emojiStrip(option.name)
     }))).then(() => callback(true, pollId));
   });
 
@@ -183,11 +184,11 @@ io.on('connection', (socket) => {
     if (UNLOCKED[data.id] === socketId) {
       query('UPDATE polls SET ? WHERE id = ?', [{
         updated_at: Date.now(),
-        topic: data.topic
+        topic: emojiStrip(data.topic)
       }, data.id])
         .then(() => data.options.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{
           updated_at: Date.now(),
-          name: option.name
+          name: emojiStrip(option.name)
         }, option.id]))))
         .then(() => Promise.all(promises))
         .then(() => getPollData(data.id))

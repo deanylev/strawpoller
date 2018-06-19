@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "ejs": "^2.6.1",
+    "emoji-strip": "^1.0.1",
     "express": "^4.16.3",
     "md5": "^2.2.1",
     "mysql": "^2.15.0",
