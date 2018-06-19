@@ -12,8 +12,15 @@ export default Component.extend({
   allowEditing: false,
   editPassword: '',
   options: null,
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'socketConnected', function() {
-    return !(this.get('topic') && this.get('options').filter((option) => option.name).length >= 2 && this.get('socketConnected'));
+  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socketConnected', function() {
+    // topic can't be blank
+    return !(this.get('topic')
+    // must have at least two options that aren't blank
+    && this.get('options').filter((option) => option.name).length >= 2
+    // password can't be blank if allowing editing
+    && (this.get('editPassword') || !this.get('allowEditing'))
+    // must be connected to the server
+    && this.get('socketConnected'));
   }),
 
   init() {

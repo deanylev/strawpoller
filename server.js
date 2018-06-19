@@ -88,6 +88,7 @@ io.on('connection', (socket) => {
     id: socketId,
     clientIp
   });
+
   socket.on('disconnect', () => {
     console.log('client disconnected', {
       id: socketId,
@@ -102,6 +103,7 @@ io.on('connection', (socket) => {
       }
     });
   });
+
   const getPollData = (id) => {
     return new Promise((resolve, reject) => {
       query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
@@ -141,23 +143,29 @@ io.on('connection', (socket) => {
       });
     });
   };
+
   socket.on('create poll', (data, callback) => {
     const pollId = uuidv4();
-    query('INSERT INTO polls SET ?', {
-      id: pollId,
-      created_at: Date.now(),
-      updated_at: Date.now(),
-      ip_address: clientIp,
-      topic: emojiStrip(data.topic),
-      allow_editing: data.allow_editing || false,
-      edit_password: md5(data.edit_password || uuidv4())
-    }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
-      id: uuidv4(),
-      created_at: Date.now(),
-      updated_at: Date.now(),
-      poll_id: pollId,
-      name: emojiStrip(option.name)
-    }))).then(() => callback(true, pollId));
+    // match client-side validation
+    if (data.topic && data.options.length >= 2 && (data.edit_password || !data.allow_editing)) {
+      query('INSERT INTO polls SET ?', {
+        id: pollId,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        ip_address: clientIp,
+        topic: emojiStrip(data.topic),
+        allow_editing: data.allow_editing || false,
+        edit_password: md5(data.edit_password || uuidv4())
+      }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
+        id: uuidv4(),
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        poll_id: pollId,
+        name: emojiStrip(option.name)
+      }))).then(() => callback(true, pollId));
+    } else {
+      callback(false);
+    }
   });
 
   socket.on('view poll', (id) => {
@@ -181,7 +189,8 @@ io.on('connection', (socket) => {
 
   socket.on('save poll', (data, callback) => {
     const promises = [];
-    if (UNLOCKED[data.id] === socketId) {
+    // match client-side validation
+    if (UNLOCKED[data.id] === socketId && data.topic && data.options.length >= 2) {
       query('UPDATE polls SET ? WHERE id = ?', [{
         updated_at: Date.now(),
         topic: emojiStrip(data.topic)
