@@ -2,12 +2,14 @@ import Component from '@ember/component';
 import config from '../../config/environment';
 
 export default Component.extend({
+  socket: Ember.inject.service(),
+
   initialLoad: false,
-  socket: null,
-  socketConnected: false,
-  socketDisconnected: Ember.computed.not('socketConnected'),
   topic: '',
   options: [],
+
+  handleData: null,
+
   pie: null,
   pieData: Ember.computed('options.@each.votes', function() {
     return this.get('options').map((option) => ({
@@ -15,6 +17,7 @@ export default Component.extend({
       value: option.votes
     }));
   }),
+
   votesDidChange: Ember.observer('options.@each.votes', function() {
     if (this.get('pie')) {
       this.get('pie').updateProp('data.content', this.get('pieData'));
@@ -24,13 +27,7 @@ export default Component.extend({
   init() {
     this._super(...arguments);
 
-    this.set('socket', io(config.APP.SOCKET_HOST));
-
-    this.get('socket').on('connect', () => this.set('socketConnected', true));
-    this.get('socket').on('disconnect', () => this.set('socketConnected', false));
-
-    this.get('socket').emit('view poll', this.get('poll_id'));
-    this.get('socket').on('poll data', (data) => {
+    this.set('handleData', (data) => {
       this.set('topic', data.topic);
       this.set('options', data.options);
       if (!this.get('initialLoad')) {
@@ -51,10 +48,13 @@ export default Component.extend({
         this.set('initialLoad', true);
       }
     });
+
+    this.get('socket').sendFrame('view poll', this.get('poll_id'));
+    this.get('socket').registerListener('poll data', this.handleData);
   },
 
   willDestroy() {
-    this.get('socket').disconnect();
+    this.get('socket').unregisterListener('poll data', this.handleData);
 
     this._super(...arguments);
   },
@@ -62,15 +62,15 @@ export default Component.extend({
   actions: {
     vote(optionId) {
       this.get('options').filter((option) => option.selected && option.id !== optionId).forEach((option) => {
-        this.get('socket').emit('remove vote', option.id, () => {
-          Ember.set(option, 'selected', false);
-        });
+        this.get('socket').sendFrame('remove vote', {
+          id: option.id
+        }).then(() => Ember.set(option, 'selected', false));
       });
 
       const option = this.get('options').find((option) => option.id === optionId);
-      this.get('socket').emit(option.selected ? 'remove vote' : 'add vote', optionId, () => {
-        Ember.set(option, 'selected', !option.selected);
-      });
+      this.get('socket').sendFrame(option.selected ? 'remove vote' : 'add vote', {
+        id: optionId
+      }).then(() => Ember.set(option, 'selected', !option.selected));
     }
   }
 });

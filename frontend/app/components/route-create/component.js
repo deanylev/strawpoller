@@ -3,16 +3,13 @@ import config from '../../config/environment';
 
 export default Component.extend({
   router: Ember.inject.service(),
-
-  socket: null,
-  socketConnected: false,
-  socketDisconnected: Ember.computed.not('socketConnected'),
+  socket: Ember.inject.service(),
 
   topic: '',
   allowEditing: false,
   editPassword: '',
   options: null,
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socketConnected', function() {
+  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic')
     // must have at least two options that aren't blank
@@ -20,23 +17,13 @@ export default Component.extend({
     // password can't be blank if allowing editing
     && (this.get('editPassword') || !this.get('allowEditing'))
     // must be connected to the server
-    && this.get('socketConnected'));
+    && this.get('socket.connected'));
   }),
 
   init() {
     this._super(...arguments);
 
-    this.set('socket', io(config.APP.SOCKET_HOST));
     this.set('options', []);
-
-    this.get('socket').on('connect', () => this.set('socketConnected', true));
-    this.get('socket').on('disconnect', () => this.set('socketConnected', false));
-  },
-
-  willDestroy() {
-    this.get('socket').disconnect();
-
-    this._super(...arguments);
   },
 
   actions: {
@@ -51,20 +38,13 @@ export default Component.extend({
     },
 
     createPoll() {
-      return new Ember.RSVP.Promise((resolve, reject) => {
-        this.get('socket').emit('create poll', {
-          topic: this.get('topic'),
-          options: this.get('options').filter((option) => option.name),
-          allow_editing: this.get('allowEditing') ? 1 : 0,
-          edit_password: this.get('editPassword')
-        }, (success, id) => {
-          if (success) {
-            this.get('router').transitionTo('view', id);
-            resolve();
-          } else {
-            reject();
-          }
-        });
+      return this.get('socket').sendFrame('create poll', {
+        topic: this.get('topic'),
+        options: this.get('options').filter((option) => option.name),
+        allow_editing: this.get('allowEditing') ? 1 : 0,
+        edit_password: this.get('editPassword')
+      }).then((data) => {
+        this.get('router').transitionTo('view', data.id);
       });
     }
   }

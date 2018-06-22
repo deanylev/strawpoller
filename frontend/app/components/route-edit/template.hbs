@@ -23,6 +23,6 @@
     {{#if error}}
       <p class="text-danger">{{error}}</p>
     {{/if}}
-    {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(not editPassword)}}Submit{{/spin-button}}
+    {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not editPassword) socket.disconnected)}}Submit{{/spin-button}}
   {{/if}}
 </form>

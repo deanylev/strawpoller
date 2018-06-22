@@ -3,10 +3,7 @@ import config from '../../config/environment';
 
 export default Component.extend({
   router: Ember.inject.service(),
-
-  socket: null,
-  socketConnected: false,
-  socketDisconnected: Ember.computed.not('socketConnected'),
+  socket: Ember.inject.service(),
 
   unlocked: false,
   editPassword: '',
@@ -14,7 +11,7 @@ export default Component.extend({
 
   topic: '',
   options: null,
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'socketConnected', function() {
+  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic')
     // must have at least two options that aren't blank
@@ -22,42 +19,19 @@ export default Component.extend({
     // password can't be blank
     && this.get('editPassword')
     // must be connected to the server
-    && this.get('socketConnected'));
+    && this.get('socket.connected'));
   }),
-
-  init() {
-    this._super(...arguments);
-
-    this.set('socket', io(config.APP.SOCKET_HOST));
-
-    this.get('socket').on('connect', () => this.set('socketConnected', true));
-    this.get('socket').on('disconnect', () => this.set('socketConnected', false));
-  },
-
-  willDestroy() {
-    this.get('socket').disconnect();
-
-    this._super(...arguments);
-  },
 
   actions: {
     submitPassword() {
-      return new Ember.RSVP.Promise((resolve, reject) => {
-        this.get('socket').emit('unlock poll', {
-          id: this.get('poll_id'),
-          password: this.get('editPassword')
-        }, (success, data) => {
-          if (success) {
-            this.set('topic', data.topic);
-            this.set('options', data.options);
-            this.set('unlocked', true);
-            resolve();
-          } else {
-            this.set('error', data.error);
-            reject();
-          }
-        });
-      });
+      return this.get('socket').sendFrame('unlock poll', {
+        id: this.get('poll_id'),
+        password: this.get('editPassword')
+      }).then((data) => {
+        this.set('topic', data.topic);
+        this.set('options', data.options);
+        this.set('unlocked', true);
+      }).catch((data) => this.set('error', data.error));
     },
 
     addOption() {
@@ -72,19 +46,12 @@ export default Component.extend({
 
     savePoll() {
       return new Ember.RSVP.Promise((resolve, reject) => {
-        this.get('socket').emit('edit poll', {
+        this.get('socket').sendFrame('edit poll', {
           id: this.get('poll_id'),
           topic: this.get('topic'),
           edit_password: this.get('editPassword'),
           options: this.get('options').filter((option) => option.name)
-        }, (success) => {
-          if (success) {
-            this.get('router').transitionTo('view', this.get('poll_id'));
-            resolve();
-          } else {
-            reject();
-          }
-        });
+        }).then(() => this.get('router').transitionTo('view', this.get('poll_id')));
       });
     }
   }

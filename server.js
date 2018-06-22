@@ -145,11 +145,11 @@ io.on('connection', (socket) => {
   };
 
   socket.on('create poll', (data, callback) => {
-    const pollId = uuidv4();
+    const id = uuidv4();
     // match client-side validation
     if (data.topic && data.options.length >= 2 && (data.edit_password || !data.allow_editing)) {
       query('INSERT INTO polls SET ?', {
-        id: pollId,
+        id,
         created_at: Date.now(),
         updated_at: Date.now(),
         ip_address: clientIp,
@@ -160,9 +160,11 @@ io.on('connection', (socket) => {
         id: uuidv4(),
         created_at: Date.now(),
         updated_at: Date.now(),
-        poll_id: pollId,
+        poll_id: id,
         name: emojiStrip(option.name)
-      }))).then(() => callback(true, pollId));
+      }))).then(() => callback(true, {
+        id
+      }));
     } else {
       callback(false);
     }
@@ -216,13 +218,13 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('add vote', (optionId) => {
+  socket.on('add vote', (data) => {
     Promise.all([
-      query('SELECT poll_id FROM options WHERE id = ?', [optionId]),
+      query('SELECT poll_id FROM options WHERE id = ?', [data.id]),
       query('INSERT INTO votes SET ?', {
         id: uuidv4(),
         created_at: Date.now(),
-        option_id: optionId,
+        option_id: data.id,
         ip_address: clientIp
       })
     ]).then((values) => {
@@ -231,10 +233,10 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('remove vote', (optionId) => {
+  socket.on('remove vote', (data) => {
     Promise.all([
-      query('SELECT poll_id FROM options WHERE id = ?', [optionId]),
-      query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [optionId, clientIp])
+      query('SELECT poll_id FROM options WHERE id = ?', [data.id]),
+      query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [data.id, clientIp])
     ]).then((values) => {
       const pollId = values[0][0].poll_id;
       getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData));
