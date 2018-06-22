@@ -9,15 +9,18 @@ export default Component.extend({
   socketDisconnected: Ember.computed.not('socketConnected'),
 
   unlocked: false,
-  wrongPassword: false,
+  editPassword: '',
+  error: '',
 
   topic: '',
   options: null,
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'socketConnected', function() {
+  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'socketConnected', function() {
     // topic can't be blank
     return !(this.get('topic')
     // must have at least two options that aren't blank
     && this.get('options').filter((option) => option.name).length >= 2
+    // password can't be blank
+    && this.get('editPassword')
     // must be connected to the server
     && this.get('socketConnected'));
   }),
@@ -29,11 +32,6 @@ export default Component.extend({
 
     this.get('socket').on('connect', () => this.set('socketConnected', true));
     this.get('socket').on('disconnect', () => this.set('socketConnected', false));
-
-    this.get('socket').emit('edit poll', this.get('poll_id'), (pollData) => {
-      this.set('topic', pollData.topic);
-      this.set('options', pollData.options);
-    });
   },
 
   willDestroy() {
@@ -48,12 +46,14 @@ export default Component.extend({
         this.get('socket').emit('unlock poll', {
           id: this.get('poll_id'),
           password: this.get('editPassword')
-        }, (success) => {
+        }, (success, data) => {
           if (success) {
+            this.set('topic', data.topic);
+            this.set('options', data.options);
             this.set('unlocked', true);
             resolve();
           } else {
-            this.set('wrongPassword', true);
+            this.set('error', data.error);
             reject();
           }
         });
@@ -72,9 +72,10 @@ export default Component.extend({
 
     savePoll() {
       return new Ember.RSVP.Promise((resolve, reject) => {
-        this.get('socket').emit('save poll', {
+        this.get('socket').emit('edit poll', {
           id: this.get('poll_id'),
           topic: this.get('topic'),
+          edit_password: this.get('editPassword'),
           options: this.get('options').filter((option) => option.name)
         }, (success) => {
           if (success) {

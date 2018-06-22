@@ -2,8 +2,8 @@
 const express = require('express');
 const uuidv4 = require('uuid/v4');
 const mysql = require('mysql');
-const md5 = require('md5');
 const emojiStrip = require('emoji-strip');
+const passwordHash = require('password-hash');
 
 // globals
 const PORT = process.env.PORT || 8080;
@@ -60,7 +60,7 @@ app.use(express.static('public'));
   ip_address varchar(45) NOT NULL, \
   topic mediumtext NOT NULL, \
   allow_editing tinyint(1) NOT NULL, \
-  edit_password varchar(32) NOT NULL, \
+  edit_password varchar(255) NOT NULL, \
   PRIMARY KEY (id), \
   UNIQUE KEY id_UNIQUE (id) \
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
@@ -155,7 +155,7 @@ io.on('connection', (socket) => {
         ip_address: clientIp,
         topic: emojiStrip(data.topic),
         allow_editing: data.allow_editing || false,
-        edit_password: md5(data.edit_password || uuidv4())
+        edit_password: passwordHash.generate(data.edit_password || uuidv4())
       }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
         id: uuidv4(),
         created_at: Date.now(),
@@ -172,28 +172,34 @@ io.on('connection', (socket) => {
     getPollData(id).then((pollData) => socket.join(id, () => socket.emit('poll data', pollData)));
   });
 
-  socket.on('edit poll', (id, callback) => {
-    getPollData(id).then(callback);
-  });
-
   socket.on('unlock poll', (data, callback) => {
     query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
-      if ((polls[0] && polls[0].allow_editing && polls[0].edit_password === md5(data.password)) || data.password === process.env.MASTER_PASS) {
-        UNLOCKED[data.id] = socketId;
-        callback(true);
+      const poll = polls[0];
+      if (poll) {
+        if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === process.env.MASTER_PASS) {
+          UNLOCKED[data.id] = socketId;
+          getPollData(data.id).then((pollData) => callback(true, pollData));
+        } else {
+          callback(false, {
+            error: 'Password incorrect.'
+          });
+        }
       } else {
-        callback(false);
+        callback(false, {
+          error: 'Poll not found.'
+        });
       }
     });
   });
 
-  socket.on('save poll', (data, callback) => {
+  socket.on('edit poll', (data, callback) => {
     const promises = [];
     // match client-side validation
-    if (UNLOCKED[data.id] === socketId && data.topic && data.options.length >= 2) {
+    if (UNLOCKED[data.id] === socketId && data.topic && data.options.length >= 2 && data.edit_password) {
       query('UPDATE polls SET ? WHERE id = ?', [{
         updated_at: Date.now(),
-        topic: emojiStrip(data.topic)
+        topic: emojiStrip(data.topic),
+        edit_password: passwordHash.generate(data.edit_password)
       }, data.id])
         .then(() => data.options.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{
           updated_at: Date.now(),

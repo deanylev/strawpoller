@@ -3,6 +3,10 @@
     <div class="form-group">
       {{textarea class="form-control" value=topic placeholder="Enter a topic"}}
     </div>
+    <br>
+    <div class="form-group">
+      {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password"}}
+    </div>
     {{#if options}}
       <h2>Options</h2>
       {{#each options as |option index|}}
@@ -16,8 +20,8 @@
   {{else}}
     {{input class="form-control" type="password" value=editPassword placeholder="Enter the edit password"}}
     <br>
-    {{#if wrongPassword}}
-      <p class="text-danger">Password incorrect.</p>
+    {{#if error}}
+      <p class="text-danger">{{error}}</p>
     {{/if}}
     {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(not editPassword)}}Submit{{/spin-button}}
   {{/if}}
