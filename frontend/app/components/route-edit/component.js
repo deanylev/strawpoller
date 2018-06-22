@@ -29,6 +29,7 @@ export default Component.extend({
         password: this.get('editPassword')
       }).then((data) => {
         this.set('topic', data.topic);
+        this.set('public', data.public);
         this.set('options', data.options);
         this.set('unlocked', true);
       }).catch((data) => this.set('error', data.error));
@@ -49,6 +50,7 @@ export default Component.extend({
         this.get('socket').sendFrame('edit poll', {
           id: this.get('poll_id'),
           topic: this.get('topic'),
+          public: this.get('public') ? 1 : 0,
           edit_password: this.get('editPassword'),
           options: this.get('options').filter((option) => option.name)
         }).then(() => this.get('router').transitionTo('view', this.get('poll_id')));

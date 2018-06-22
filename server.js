@@ -59,6 +59,7 @@ app.use(express.static('public'));
   updated_at bigint(13) NOT NULL, \
   ip_address varchar(45) NOT NULL, \
   topic mediumtext NOT NULL, \
+  public tinyint(1) NOT NULL, \
   allow_editing tinyint(1) NOT NULL, \
   edit_password varchar(255) NOT NULL, \
   PRIMARY KEY (id), \
@@ -133,9 +134,10 @@ io.on('connection', (socket) => {
                 option.selected = true;
               }
             });
-          }).then(() => query('SELECT topic FROM polls WHERE id = ?', [id]).then((polls) => {
+          }).then(() => query('SELECT topic, public FROM polls WHERE id = ?', [id]).then((polls) => {
             resolve({
               topic: polls[0] ? polls[0].topic : 'Poll not found.',
+              public: polls[0] ? !!polls[0].public : false,
               options
             });
           }));
@@ -143,6 +145,12 @@ io.on('connection', (socket) => {
       });
     });
   };
+
+  socket.on('get public polls', (data, callback) => {
+    query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC').then((polls) => {
+      callback(true, polls);
+    });
+  });
 
   socket.on('create poll', (data, callback) => {
     const id = uuidv4();
@@ -154,7 +162,8 @@ io.on('connection', (socket) => {
         updated_at: Date.now(),
         ip_address: clientIp,
         topic: emojiStrip(data.topic),
-        allow_editing: data.allow_editing || false,
+        public: data.public,
+        allow_editing: data.allow_editing,
         edit_password: passwordHash.generate(data.edit_password || uuidv4())
       }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
         id: uuidv4(),
@@ -201,6 +210,7 @@ io.on('connection', (socket) => {
       query('UPDATE polls SET ? WHERE id = ?', [{
         updated_at: Date.now(),
         topic: emojiStrip(data.topic),
+        public: data.public,
         edit_password: passwordHash.generate(data.edit_password)
       }, data.id])
         .then(() => data.options.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{

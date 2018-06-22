@@ -5,6 +5,7 @@ export default Component.extend({
   socket: Ember.inject.service(),
 
   initialLoad: false,
+
   topic: '',
   options: [],
 

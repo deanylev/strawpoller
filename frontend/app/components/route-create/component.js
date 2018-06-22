@@ -6,6 +6,7 @@ export default Component.extend({
   socket: Ember.inject.service(),
 
   topic: '',
+  public: false,
   allowEditing: false,
   editPassword: '',
   options: null,
@@ -20,10 +21,15 @@ export default Component.extend({
     && this.get('socket.connected'));
   }),
 
+  publicPolls: [],
+
   init() {
     this._super(...arguments);
 
     this.set('options', []);
+    this.get('socket').sendFrame('get public polls').then((publicPolls) => {
+      this.set('publicPolls', publicPolls);
+    });
   },
 
   actions: {
@@ -40,9 +46,10 @@ export default Component.extend({
     createPoll() {
       return this.get('socket').sendFrame('create poll', {
         topic: this.get('topic'),
-        options: this.get('options').filter((option) => option.name),
+        public: this.get('public') ? 1 : 0,
         allow_editing: this.get('allowEditing') ? 1 : 0,
-        edit_password: this.get('editPassword')
+        edit_password: this.get('editPassword'),
+        options: this.get('options').filter((option) => option.name)
       }).then((data) => {
         this.get('router').transitionTo('view', data.id);
       });

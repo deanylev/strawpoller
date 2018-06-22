@@ -3,6 +3,10 @@
     {{textarea class="form-control" value=topic placeholder="Enter a topic"}}
   </div>
   <div class="form-check">
+    {{input id="public" class="form-check-input" type="checkbox" checked=public}}
+    <label class="form-check-label" for="public">Public?</label>
+  </div>
+  <div class="form-check">
     {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
     <label class="form-check-label" for="allow-editing">Allow editing?</label>
   </div>
@@ -27,3 +31,10 @@
   <br><br>
   {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "createPoll") disabled=disabled}}Create{{/spin-button}}
 </form>
+<br><br>
+{{#if publicPolls}}
+  <h2>Public Polls</h2>
+  {{#each publicPolls as |poll|}}
+    {{#link-to "view" poll.id}}{{poll.topic}}{{/link-to}}<br>
+  {{/each}}
+{{/if}}
