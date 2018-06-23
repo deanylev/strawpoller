@@ -6,55 +6,81 @@ export default Component.extend({
   socket: Ember.inject.service(),
 
   unlocked: false,
-  editPassword: '',
+  password: '',
   error: '',
 
+  admin: false,
+
   topic: '',
+  allowEditing: false,
+  editPassword: '',
   options: null,
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'socket.connected', function() {
+  newOptions: null,
+  removedOptions: [],
+  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'newOptions.[]', 'newOptions.@each.name', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic')
     // must have at least two options that aren't blank
-    && this.get('options').filter((option) => option.name).length >= 2
-    // password can't be blank
-    && this.get('editPassword')
+    && this.get('options').concat(this.get('newOptions')).filter((option) => option.name).length >= 2
     // must be connected to the server
     && this.get('socket.connected'));
   }),
+
+  init() {
+    this._super(...arguments);
+
+    this.set('newOptions', []);
+  },
 
   actions: {
     submitPassword() {
       return this.get('socket').sendFrame('unlock poll', {
         id: this.get('poll_id'),
-        password: this.get('editPassword')
+        password: this.get('password')
       }).then((data) => {
+        this.set('admin', data.admin);
         this.set('topic', data.topic);
         this.set('public', data.public);
+        this.set('allowEditing', data.allow_editing);
         this.set('options', data.options);
         this.set('unlocked', true);
       }).catch((data) => this.set('error', data.error));
     },
 
     addOption() {
-      this.get('options').pushObject({
+      this.get('newOptions').pushObject({
         name: ''
       });
     },
 
-    removeOption(index) {
-      this.set('options', this.get('options').filter((option, i) => i !== index));
+    removeOption(array, index) {
+      if (array === 'options') {
+        this.get('removedOptions').pushObject(this.get(array)[index].id);
+      }
+
+      this.set(array, this.get(array).filter((option, i) => i !== index));
     },
 
     savePoll() {
-      return new Ember.RSVP.Promise((resolve, reject) => {
-        this.get('socket').sendFrame('edit poll', {
-          id: this.get('poll_id'),
-          topic: this.get('topic'),
-          public: this.get('public') ? 1 : 0,
-          edit_password: this.get('editPassword'),
-          options: this.get('options').filter((option) => option.name)
-        }).then(() => this.get('router').transitionTo('view', this.get('poll_id')));
-      });
+      return this.get('socket').sendFrame('edit poll', {
+        id: this.get('poll_id'),
+        topic: this.get('topic'),
+        public: this.get('public') ? 1 : 0,
+        allow_editing: this.get('allowEditing') ? 1 : 0,
+        edit_password: this.get('editPassword'),
+        options: this.get('options').filter((option) => option.name).concat(this.get('newOptions').filter((option) => option.name)),
+        removed_options: this.get('removedOptions')
+      }).then(() => this.get('router').transitionTo('view', this.get('poll_id')));
+    },
+
+    deletePoll() {
+      if (confirm('Are you sure? This cannot be undone.')) {
+        return this.get('socket').sendFrame('delete poll', {
+          id: this.get('poll_id')
+        }).then(() => this.get('router').transitionTo('create'));
+      } else {
+        return Ember.RSVP.reject();
+      }
     }
   }
 });

@@ -8,25 +8,45 @@
       <label class="form-check-label" for="public">Public?</label>
     </div>
     <br>
-    <div class="form-group">
-      {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password"}}
-    </div>
-    {{#if options}}
+    {{#if admin}}
+      <div class="form-check">
+        {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
+        <label class="form-check-label" for="allow-editing">Allow editing?</label>
+      </div>
+    {{/if}}
+    <br>
+    {{#if allowEditing}}
+      <div class="form-group">
+        {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password (leave blank to keep unchanged)"}}
+      </div>
+    {{/if}}
+    {{#if (or options newOptions)}}
       <h2>Options</h2>
       {{#each options as |option index|}}
         <div class="form-group">
           {{input class="form-control" type="text" value=option.name placeholder="Enter an option"}}
+          <br>
+          <button class="btn btn-danger" {{action "removeOption" "options" index}}>Delete</button>
+        </div>
+      {{/each}}
+      {{#each newOptions as |option index|}}
+        <div class="form-group">
+          {{input class="form-control" type="text" value=option.name placeholder="Enter an option"}}
+          <br>
+          <button class="btn btn-danger" {{action "removeOption" "newOptions" index}}>Delete</button>
         </div>
       {{/each}}
     {{/if}}
+    <br>
+    <button class="btn btn-primary" {{action "addOption"}}>+ Add Option</button>
     <br><br>
     {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "savePoll") disabled=disabled}}Save{{/spin-button}}
-  {{else}}
-    {{input class="form-control" type="password" value=editPassword placeholder="Enter the edit password"}}
+    {{#spin-button class="btn btn-danger btn-block btn-lg" buttonStyle="zoom-out" action=(action "deletePoll") disabled=socket.disconnected}}Delete Poll{{/spin-button}}
     <br>
-    {{#if error}}
-      <p class="text-danger">{{error}}</p>
-    {{/if}}
-    {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not editPassword) socket.disconnected)}}Submit{{/spin-button}}
+  {{else}}
+    {{input class="form-control" type="password" value=password placeholder="Enter the edit password"}}
+    <br>
+    <p class="text-danger">{{error}}</p>
+    {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not password) socket.disconnected)}}Submit{{/spin-button}}
   {{/if}}
 </form>

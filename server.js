@@ -95,14 +95,6 @@ io.on('connection', (socket) => {
       id: socketId,
       clientIp
     });
-
-    // revoke edit permissions from any polls,
-    // for extra peace of mind
-    Object.keys(UNLOCKED).forEach((id) => {
-      if (UNLOCKED[id] === socketId) {
-        UNLOCKED[id] = null;
-      }
-    });
   });
 
   const getPollData = (id) => {
@@ -134,11 +126,13 @@ io.on('connection', (socket) => {
                 option.selected = true;
               }
             });
-          }).then(() => query('SELECT topic, public FROM polls WHERE id = ?', [id]).then((polls) => {
+          }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id]).then((polls) => {
+            const poll = polls[0];
             resolve({
-              topic: polls[0] ? polls[0].topic : 'Poll not found.',
-              public: polls[0] ? !!polls[0].public : false,
-              options
+              topic: poll ? poll.topic : 'Poll not found.',
+              public: poll ? !!poll.public : false,
+              allow_editing: poll ? !!poll.allow_editing : false,
+              options: poll ? options : []
             });
           }));
         });
@@ -191,8 +185,19 @@ io.on('connection', (socket) => {
     query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
       const poll = polls[0];
       if (poll) {
-        if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === process.env.MASTER_PASS) {
-          UNLOCKED[data.id] = socketId;
+        if (data.password === process.env.MASTER_PASS) {
+          UNLOCKED[data.id] = {
+            socketId,
+            admin: true
+          };
+          getPollData(data.id).then((pollData) => callback(true, Object.assign(pollData, {
+            admin: true
+          })));
+        } else if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === process.env.MASTER_PASS) {
+          UNLOCKED[data.id] = {
+            socketId,
+            admin: false
+          };
           getPollData(data.id).then((pollData) => callback(true, pollData));
         } else {
           callback(false, {
@@ -210,18 +215,55 @@ io.on('connection', (socket) => {
   socket.on('edit poll', (data, callback) => {
     const promises = [];
     // match client-side validation
-    if (UNLOCKED[data.id] === socketId && data.topic && data.options.length >= 2 && data.edit_password) {
-      query('UPDATE polls SET ? WHERE id = ?', [{
+    if (UNLOCKED[data.id].socketId === socketId && data.topic && data.options.length >= 2) {
+      const dbData = {
         updated_at: Date.now(),
         topic: emojiStrip(data.topic),
-        public: data.public,
-        edit_password: passwordHash.generate(data.edit_password)
-      }, data.id])
-        .then(() => data.options.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{
-          updated_at: Date.now(),
-          name: emojiStrip(option.name)
-        }, option.id]))))
-        .then(() => Promise.all(promises))
+        public: data.public
+      };
+      if (UNLOCKED[data.id].admin) {
+        dbData.allow_editing = data.allow_editing;
+      }
+      if (data.edit_password) {
+        dbData.edit_password = passwordHash.generate(data.edit_password);
+      }
+      // hack to keep MySQL happy
+      if (!data.removed_options.length) {
+        data.removed_options.push(uuidv4());
+      }
+      let currentOptions = null;
+      let newOptions = null;
+      query('SELECT id FROM options WHERE poll_id = ?', [data.id]).then((options) => {
+        currentOptions = data.options.filter((o1) => options.find((o2) => o2.id === o1.id));
+        newOptions = data.options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
+        return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
+      })
+      .then(() => query('DELETE FROM options WHERE id IN (?)', [data.removed_options]))
+      .then(() => currentOptions.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{
+        updated_at: Date.now(),
+        name: emojiStrip(option.name)
+      }, option.id]))))
+      .then(() => newOptions.forEach((option) => promises.push(query('INSERT INTO options SET ?', [{
+        id: uuidv4(),
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        poll_id: data.id,
+        name: emojiStrip(option.name)
+      }, option.id]))))
+      .then(() => Promise.all(promises))
+      .then(() => getPollData(data.id))
+      .then((pollData) => {
+        io.to(data.id).emit('poll data', pollData);
+        callback(true);
+      });
+    } else {
+      callback(false);
+    }
+  });
+
+  socket.on('delete poll', (data, callback) => {
+    if (UNLOCKED[data.id].socketId === socketId) {
+      query('DELETE FROM polls WHERE id = ?', [data.id])
         .then(() => getPollData(data.id))
         .then((pollData) => {
           io.to(data.id).emit('poll data', pollData);

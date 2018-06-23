@@ -4,7 +4,7 @@
   <br>
   {{#each options as |option|}}
     <div class="vote text-light {{if option.selected "bg-success" "bg-dark"}}" {{action "vote" option.id on="click"}}>
-      <h5>{{option.name}}:</h5>
+      <h5>{{option.name}}</h5>
       <p>{{option.votes}} votes</p>
     </div>
   {{/each}}
