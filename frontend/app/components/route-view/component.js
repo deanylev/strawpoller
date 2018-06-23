@@ -10,6 +10,7 @@ export default Component.extend({
   options: [],
 
   handleData: null,
+  join: null,
 
   pie: null,
   pieData: Ember.computed('options.@each.votes', function() {
@@ -50,14 +51,24 @@ export default Component.extend({
       }
     });
 
-    this.get('socket').registerListener('poll data', this.handleData);
-    this.get('socket').sendFrame('join poll', {
-      id: this.get('poll_id')
+    this.set('join', () => {
+      this.get('socket').sendFrame('join poll', {
+        id: this.get('poll_id')
+      });
     });
+
+    this.join();
+
+    this.get('socket').registerListener('poll data', this.handleData);
+    this.get('socket').registerListener('connect', this.join);
   },
 
   willDestroy() {
+    // remove listeners
     this.get('socket').unregisterListener('poll data', this.handleData);
+    this.get('socket').unregisterListener('connect', this.join);
+
+    // unsubscribe from the room
     this.get('socket').sendFrame('leave poll', {
       id: this.get('poll_id')
     });
