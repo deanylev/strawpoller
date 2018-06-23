@@ -50,12 +50,17 @@ export default Component.extend({
       }
     });
 
-    this.get('socket').sendFrame('view poll', this.get('poll_id'));
     this.get('socket').registerListener('poll data', this.handleData);
+    this.get('socket').sendFrame('join poll', {
+      id: this.get('poll_id')
+    });
   },
 
   willDestroy() {
     this.get('socket').unregisterListener('poll data', this.handleData);
+    this.get('socket').sendFrame('leave poll', {
+      id: this.get('poll_id')
+    });
 
     this._super(...arguments);
   },

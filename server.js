@@ -179,8 +179,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('view poll', (id) => {
-    getPollData(id).then((pollData) => socket.join(id, () => socket.emit('poll data', pollData)));
+  socket.on('join poll', (data) => {
+    getPollData(data.id).then((pollData) => socket.join(data.id, () => socket.emit('poll data', pollData)));
+  });
+
+  socket.on('leave poll', (data) => {
+    socket.leave(data.id);
   });
 
   socket.on('unlock poll', (data, callback) => {
