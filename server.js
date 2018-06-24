@@ -100,13 +100,8 @@ io.on('connection', (socket) => {
   const getPollData = (id) => {
     return new Promise((resolve, reject) => {
       query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
-        const promises = [];
+        const promises = results.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
         const options = [];
-
-        results.forEach((option) => {
-          const promise = query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]);
-          promises.push(promise);
-        });
 
         Promise.all(promises).then((values) => {
           const getSelected = [];
@@ -159,13 +154,13 @@ io.on('connection', (socket) => {
         public: data.public,
         allow_editing: data.allow_editing,
         edit_password: passwordHash.generate(data.edit_password || uuidv4())
-      }).then(() => data.options.forEach((option) => query('INSERT INTO options SET ?', {
+      }).then(() => Promise.all(data.options.map((option) => query('INSERT INTO options SET ?', {
         id: uuidv4(),
         created_at: Date.now(),
         updated_at: Date.now(),
         poll_id: id,
         name: emojiStrip(option.name)
-      }))).then(() => callback(true, {
+      })))).then(() => callback(true, {
         id
       }));
     } else {
@@ -213,7 +208,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('edit poll', (data, callback) => {
-    const promises = [];
     // match client-side validation
     if (UNLOCKED[data.id].socketId === socketId && data.topic && data.options.length >= 2) {
       const dbData = {
@@ -239,18 +233,17 @@ io.on('connection', (socket) => {
         return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
       })
       .then(() => query('DELETE FROM options WHERE id IN (?)', [data.removed_options]))
-      .then(() => currentOptions.forEach((option) => promises.push(query('UPDATE options SET ? WHERE id = ?', [{
+      .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
         updated_at: Date.now(),
         name: emojiStrip(option.name)
       }, option.id]))))
-      .then(() => newOptions.forEach((option) => promises.push(query('INSERT INTO options SET ?', [{
+      .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
         id: uuidv4(),
         created_at: Date.now(),
         updated_at: Date.now(),
         poll_id: data.id,
         name: emojiStrip(option.name)
       }, option.id]))))
-      .then(() => Promise.all(promises))
       .then(() => getPollData(data.id))
       .then((pollData) => {
         io.to(data.id).emit('poll data', pollData);
@@ -275,15 +268,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('add vote', (data) => {
-    const promises = [];
     let pollId = null;
     query('SELECT poll_id FROM options WHERE id = ?', [data.id])
       .then((options) => {
         pollId = options[0].poll_id;
         return query('SELECT id FROM options WHERE poll_id = ?', [pollId])
       })
-      .then((options) => options.forEach((option) => promises.push(query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
-      .then(() => Promise.all(promises))
+      .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
       .then(() => query('INSERT INTO votes SET ?', {
         id: uuidv4(),
         created_at: Date.now(),
