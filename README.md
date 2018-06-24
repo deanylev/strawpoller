@@ -38,4 +38,4 @@ Run `/build_frontend.sh`. It will build the frontend and move the generated file
 
 `DB_NAME` - MySQL DB name. (default 'awesome_media_downloader')
 
-`MASTER_PASS` - An optional 'master password' to access editing for any poll, whether editing is set to allowed or not. (default null)
+`MASTER_PASS` - An optional 'master password' to access editing for any poll, whether editing is set to allowed or not. Also grants special admin permissions when editing a poll. (default null)
