@@ -80,12 +80,6 @@ export default Component.extend({
 
   actions: {
     vote(optionId) {
-      this.get('options').filter((option) => option.selected && option.id !== optionId).forEach((option) => {
-        this.get('socket').sendFrame('remove vote', {
-          id: option.id
-        }).then(() => Ember.set(option, 'selected', false));
-      });
-
       const option = this.get('options').find((option) => option.id === optionId);
       this.get('socket').sendFrame(option.selected ? 'remove vote' : 'add vote', {
         id: optionId

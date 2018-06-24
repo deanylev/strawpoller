@@ -275,18 +275,22 @@ io.on('connection', (socket) => {
   });
 
   socket.on('add vote', (data) => {
-    Promise.all([
-      query('SELECT poll_id FROM options WHERE id = ?', [data.id]),
-      query('INSERT INTO votes SET ?', {
+    const promises = [];
+    let pollId = null;
+    query('SELECT poll_id FROM options WHERE id = ?', [data.id])
+      .then((options) => {
+        pollId = options[0].poll_id;
+        return query('SELECT id FROM options WHERE poll_id = ?', [pollId])
+      })
+      .then((options) => options.forEach((option) => promises.push(query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
+      .then(() => Promise.all(promises))
+      .then(() => query('INSERT INTO votes SET ?', {
         id: uuidv4(),
         created_at: Date.now(),
         option_id: data.id,
         ip_address: clientIp
-      })
-    ]).then((values) => {
-      const pollId = values[0][0].poll_id;
-      getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData));
-    });
+      }))
+      .then(() => getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData)));
   });
 
   socket.on('remove vote', (data) => {
