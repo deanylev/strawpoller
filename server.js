@@ -228,27 +228,50 @@ io.on('connection', (socket) => {
       let currentOptions = null;
       let newOptions = null;
       query('SELECT id FROM options WHERE poll_id = ?', [data.id]).then((options) => {
-        currentOptions = data.options.filter((o1) => options.find((o2) => o2.id === o1.id));
-        newOptions = data.options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
-        return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
-      })
-      .then(() => query('DELETE FROM options WHERE id IN (?)', [data.removed_options]))
-      .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
-        updated_at: Date.now(),
-        name: emojiStrip(option.name)
-      }, option.id]))))
-      .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
-        id: uuidv4(),
-        created_at: Date.now(),
-        updated_at: Date.now(),
-        poll_id: data.id,
-        name: emojiStrip(option.name)
-      }, option.id]))))
-      .then(() => getPollData(data.id))
-      .then((pollData) => {
-        io.to(data.id).emit('poll data', pollData);
-        callback(true);
-      });
+          currentOptions = data.options.filter((o1) => options.find((o2) => o2.id === o1.id));
+          newOptions = data.options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
+          return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
+        })
+        .then(() => query('DELETE FROM options WHERE id IN (?)', [data.removed_options]))
+        .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
+          updated_at: Date.now(),
+          name: emojiStrip(option.name)
+        }, option.id]))))
+        .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
+          id: uuidv4(),
+          created_at: Date.now(),
+          updated_at: Date.now(),
+          poll_id: data.id,
+          name: emojiStrip(option.name)
+        }, option.id]))))
+        .then(() => {
+          if (UNLOCKED[data.id].admin) {
+            const promises = [];
+            return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id])
+              .then((votes) => {
+                const voteCount = votes[0]['COUNT(*)'];
+                if (option.votes > voteCount) {
+                  for (let i = 0; i < Math.min(option.votes - voteCount, 1000); i++) {
+                    promises.push(query('INSERT INTO votes SET ?', {
+                      id: uuidv4(),
+                      created_at: Date.now(),
+                      option_id: option.id,
+                      ip_address: 'ADMIN'
+                    }));
+                  }
+                } else {
+                  promises.push(query('DELETE FROM votes WHERE option_id = ? LIMIT ?', [option.id, voteCount - option.votes]));
+                }
+              }))).then(() => Promise.all(promises));
+          } else {
+            return Promise.resolve();
+          }
+        })
+        .then(() => getPollData(data.id))
+        .then((pollData) => {
+          io.to(data.id).emit('poll data', pollData);
+          callback(true);
+        });
     } else {
       callback(false);
     }

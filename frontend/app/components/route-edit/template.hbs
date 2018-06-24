@@ -26,6 +26,10 @@
         <div class="form-group">
           {{input class="form-control" type="text" value=option.name placeholder="Enter an option"}}
           <br>
+          {{#if admin}}
+            {{input class="form-control" type="number" value=option.votes placeholder="Enter the desired number of votes"}}
+            <br>
+          {{/if}}
           <button class="btn btn-danger" {{action "removeOption" "options" index}}>Delete</button>
         </div>
       {{/each}}
