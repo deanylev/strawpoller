@@ -1,5 +1,6 @@
+/* global Ember, d3pie */
+
 import Component from '@ember/component';
-import config from '../../config/environment';
 
 export default Component.extend({
   socket: Ember.inject.service(),
