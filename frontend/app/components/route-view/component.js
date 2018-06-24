@@ -7,6 +7,7 @@ export default Component.extend({
   initialLoad: false,
 
   topic: '',
+  allowEditing: false,
   options: [],
 
   handleData: null,
@@ -31,6 +32,7 @@ export default Component.extend({
 
     this.set('handleData', (data) => {
       this.set('topic', data.topic);
+      this.set('allowEditing', data.allow_editing);
       this.set('options', data.options);
       if (!this.get('initialLoad')) {
         const pie = new d3pie('pie', {

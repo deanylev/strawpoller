@@ -1,6 +1,10 @@
 @import "ember-cli-bootstrap-4/bootstrap";
 @import "spin-button";
 
-.vote {
+.vote, .link {
   cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline !important;
 }

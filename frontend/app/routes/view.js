@@ -11,5 +11,5 @@ export default Route.extend({
     this.render({
       into: 'application'
     });
-  }
+  },
 });

@@ -15,11 +15,11 @@
       </div>
     {{/if}}
     <br>
-    {{#if allowEditing}}
+    {{#liquid-if allowEditing}}
       <div class="form-group">
         {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password (leave blank to keep unchanged)"}}
       </div>
-    {{/if}}
+    {{/liquid-if}}
     {{#if (or options newOptions)}}
       <h2>Options</h2>
       {{#each options as |option index|}}
@@ -48,5 +48,7 @@
     <br>
     <p class="text-danger">{{error}}</p>
     {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not password) socket.disconnected)}}Submit{{/spin-button}}
+    <br>
+    <h5>{{#link-to "view" poll_id class="text-dark"}}View Poll{{/link-to}}</h5>
   {{/if}}
 </form>

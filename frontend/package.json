@@ -44,6 +44,7 @@
     "ember-truth-helpers": "^2.0.0",
     "ember-welcome-page": "^3.0.0",
     "eslint-plugin-ember": "^5.0.0",
+    "liquid-fire": "^0.29.3",
     "loader.js": "^4.2.3",
     "popper.js": "^1.14.3"
   },

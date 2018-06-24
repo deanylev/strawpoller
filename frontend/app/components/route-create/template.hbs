@@ -12,11 +12,11 @@
     <label class="form-check-label" for="allow-editing">Allow editing?</label>
   </div>
   <br>
-  {{#if allowEditing}}
+  {{#liquid-if allowEditing}}
     <div class="form-group">
       {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password"}}
     </div>
-  {{/if}}
+  {{/liquid-if}}
   {{#if options}}
     <h2>Options</h2>
     {{#each options as |option index|}}

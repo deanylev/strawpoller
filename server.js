@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
   const socketId = socket.id;
   console.log('client connected', {
     id: socketId,
-    clientIp
+    ip: clientIp
   });
 
   socket.on('disconnect', () => {
