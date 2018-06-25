@@ -5,8 +5,9 @@ const mysql = require('mysql');
 const emojiStrip = require('emoji-strip');
 const passwordHash = require('password-hash');
 
-// globals
+// constants
 const PORT = process.env.PORT || 8080;
+const QUERY_LIMIT = process.env.QUERY_LIMIT || 1000;
 
 // config
 const app = express();
@@ -127,7 +128,9 @@ io.on('connection', (socket) => {
               topic: poll ? poll.topic : 'Poll not found.',
               public: poll ? !!poll.public : false,
               allow_editing: poll ? !!poll.allow_editing : false,
-              options: poll ? options : []
+              options: poll ? options.map((option) => Object.assign(option, {
+                max: option.votes + QUERY_LIMIT
+              })) : []
             });
           }));
         });
@@ -251,7 +254,7 @@ io.on('connection', (socket) => {
               .then((votes) => {
                 const voteCount = votes[0]['COUNT(*)'];
                 if (option.votes > voteCount) {
-                  for (let i = 0; i < Math.min(option.votes - voteCount, 1000); i++) {
+                  for (let i = 0; i < Math.min(option.votes - voteCount, QUERY_LIMIT); i++) {
                     promises.push(query('INSERT INTO votes SET ?', {
                       id: uuidv4(),
                       created_at: Date.now(),
