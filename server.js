@@ -8,6 +8,7 @@ const passwordHash = require('password-hash');
 // constants
 const PORT = process.env.PORT || 8080;
 const QUERY_LIMIT = process.env.QUERY_LIMIT || 1000;
+const { MASTER_PASS } = process.env;
 
 // config
 const app = express();
@@ -21,6 +22,7 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'strawpoller'
 });
 
+// promise which resolves with the query results
 const query = (query, values) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((err, connection) => {
@@ -75,15 +77,14 @@ app.use(express.static('public'));
   PRIMARY KEY (id), \
   UNIQUE KEY id_UNIQUE (id) \
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
-].forEach((sql) => {
-  query(sql);
-});
+].forEach((sql) => query(sql));
 
 http.listen(PORT, () => console.log('listening on port', PORT));
 
 const UNLOCKED = {};
 
 io.on('connection', (socket) => {
+  // Cloudflare messes with the connecting IP
   const clientIp = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const socketId = socket.id;
   console.log('client connected', {
@@ -98,51 +99,49 @@ io.on('connection', (socket) => {
     });
   });
 
+  // promise which resolves with the topic, options and vote counts for a poll
   const getPollData = (id) => {
-    return new Promise((resolve, reject) => {
-      query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
-        const promises = results.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
-        const options = [];
-
-        Promise.all(promises).then((values) => {
-          const getSelected = [];
-          values.forEach((value, index) => {
-            const { id } = results[index];
-            options.push({
-              id,
-              name: results[index].name,
-              votes: value[0]['COUNT(*)']
-            });
-          });
-
-          query('SELECT option_id FROM votes WHERE ip_address = ?', [clientIp]).then((votes) => {
-            votes.forEach((vote) => {
-              const option = options.find((option) => option.id === vote.option_id);
-              if (option) {
-                option.selected = true;
-              }
-            });
-          }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id]).then((polls) => {
-            const poll = polls[0];
-            resolve({
-              topic: poll ? poll.topic : 'Poll not found.',
-              public: poll ? !!poll.public : false,
-              allow_editing: poll ? !!poll.allow_editing : false,
-              options: poll ? options.map((option) => Object.assign(option, {
-                max: option.votes + QUERY_LIMIT
-              })) : []
-            });
-          }));
+    const options = [];
+    let optionResults = null;
+    return query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
+      const promises = results.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
+      optionResults = results;
+      return Promise.all(promises);
+    }).then((values) => {
+      const getSelected = [];
+      values.forEach((value, index) => {
+        const { id } = optionResults[index];
+        options.push({
+          id,
+          name: optionResults[index].name,
+          votes: value[0]['COUNT(*)']
         });
       });
+
+      return query('SELECT option_id FROM votes WHERE ip_address = ?', [clientIp]).then((votes) => {
+        votes.forEach((vote) => {
+          const option = options.find((option) => option.id === vote.option_id);
+          if (option) {
+            option.selected = true;
+          }
+        });
+      });
+    }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id])).then((polls) => {
+      const poll = polls[0];
+      return {
+        topic: poll ? poll.topic : 'Poll not found.',
+        public: poll ? !!poll.public : false,
+        allow_editing: poll ? !!poll.allow_editing : false,
+        options: poll ? options.map((option) => Object.assign(option, {
+          max: option.votes + QUERY_LIMIT
+        })) : []
+      };
     });
   };
 
-  socket.on('get public polls', (data, callback) => {
-    query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC').then((polls) => {
-      callback(true, polls);
-    });
-  });
+  socket.on('get public polls', (data, callback) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC').then((polls) => {
+    callback(true, polls);
+  }));
 
   socket.on('create poll', (data, callback) => {
     const id = uuidv4();
@@ -171,32 +170,23 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('join poll', (data) => {
-    getPollData(data.id).then((pollData) => socket.join(data.id, () => socket.emit('poll data', pollData)));
-  });
-
-  socket.on('leave poll', (data) => {
-    socket.leave(data.id);
-  });
+  socket.on('join poll', (data) => getPollData(data.id).then((pollData) => socket.join(data.id, () => socket.emit('poll data', pollData))));
+  socket.on('leave poll', (data) => socket.leave(data.id));
 
   socket.on('unlock poll', (data, callback) => {
     query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
       const poll = polls[0];
       if (poll) {
-        if (data.password === process.env.MASTER_PASS) {
+        if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === MASTER_PASS) {
+          const admin = data.password === MASTER_PASS;
           UNLOCKED[data.id] = {
             socketId,
-            admin: true
+            admin
           };
+          // return data to client requesting it
           getPollData(data.id).then((pollData) => callback(true, Object.assign(pollData, {
-            admin: true
+            admin
           })));
-        } else if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === process.env.MASTER_PASS) {
-          UNLOCKED[data.id] = {
-            socketId,
-            admin: false
-          };
-          getPollData(data.id).then((pollData) => callback(true, pollData));
         } else {
           callback(false, {
             error: 'Password incorrect.'
@@ -218,6 +208,7 @@ io.on('connection', (socket) => {
         topic: emojiStrip(data.topic),
         public: data.public
       };
+      // only allow admins to change allow_editing prop
       if (UNLOCKED[data.id].admin) {
         dbData.allow_editing = data.allow_editing;
       }
@@ -235,11 +226,14 @@ io.on('connection', (socket) => {
           newOptions = data.options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
           return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
         })
+        // delete options from before that have been removed
         .then(() => query('DELETE FROM options WHERE id IN (?)', [data.removed_options]))
+        // change names of options from before
         .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
           updated_at: Date.now(),
           name: emojiStrip(option.name)
         }, option.id]))))
+        // add new options
         .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
           id: uuidv4(),
           created_at: Date.now(),
@@ -248,11 +242,13 @@ io.on('connection', (socket) => {
           name: emojiStrip(option.name)
         }, option.id]))))
         .then(() => {
+          // only allow admins to insert fake votes
           if (UNLOCKED[data.id].admin) {
             const promises = [];
             return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id])
               .then((votes) => {
                 const voteCount = votes[0]['COUNT(*)'];
+                // the new vote count is higher than the current count, votes need to be added to the db
                 if (option.votes > voteCount) {
                   for (let i = 0; i < Math.min(option.votes - voteCount, QUERY_LIMIT); i++) {
                     promises.push(query('INSERT INTO votes SET ?', {
@@ -263,6 +259,7 @@ io.on('connection', (socket) => {
                     }));
                   }
                 } else {
+                  // otherwise, votes need to be deleted from the db
                   promises.push(query('DELETE FROM votes WHERE option_id = ? LIMIT ?', [option.id, voteCount - option.votes]));
                 }
               }))).then(() => Promise.all(promises));
@@ -272,6 +269,7 @@ io.on('connection', (socket) => {
         })
         .then(() => getPollData(data.id))
         .then((pollData) => {
+          // announce
           io.to(data.id).emit('poll data', pollData);
           callback(true);
         });
@@ -282,9 +280,11 @@ io.on('connection', (socket) => {
 
   socket.on('delete poll', (data, callback) => {
     if (UNLOCKED[data.id].socketId === socketId) {
+      // delete the poll
       query('DELETE FROM polls WHERE id = ?', [data.id])
         .then(() => getPollData(data.id))
         .then((pollData) => {
+          // announce
           io.to(data.id).emit('poll data', pollData);
           callback(true);
         });
@@ -300,13 +300,16 @@ io.on('connection', (socket) => {
         pollId = options[0].poll_id;
         return query('SELECT id FROM options WHERE poll_id = ?', [pollId])
       })
+      // delete any existing votes from the same ip to prevent duplicates
       .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
+      // add the new vote
       .then(() => query('INSERT INTO votes SET ?', {
         id: uuidv4(),
         created_at: Date.now(),
         option_id: data.id,
         ip_address: clientIp
       }))
+      // announce
       .then(() => getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData)));
   });
 
