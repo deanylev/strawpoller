@@ -202,14 +202,14 @@ io.on('connection', (socket) => {
 
   socket.on('edit poll', (data, callback) => {
     // match client-side validation
-    if (UNLOCKED[data.id].socketId === socketId && data.topic && data.options.length >= 2) {
+    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId && data.topic && data.options.length >= 2) {
       const dbData = {
         updated_at: Date.now(),
         topic: emojiStrip(data.topic),
         public: data.public
       };
       // only allow admins to change allow_editing prop
-      if (UNLOCKED[data.id].admin) {
+      if (UNLOCKED[data.id] && UNLOCKED[data.id].admin) {
         dbData.allow_editing = data.allow_editing;
       }
       if (data.edit_password) {
@@ -243,14 +243,15 @@ io.on('connection', (socket) => {
         }, option.id]))))
         .then(() => {
           // only allow admins to insert fake votes
-          if (UNLOCKED[data.id].admin) {
+          if (UNLOCKED[data.id] && UNLOCKED[data.id].admin) {
+            let remainingQueries = QUERY_LIMIT;
             const promises = [];
             return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id])
               .then((votes) => {
                 const voteCount = votes[0]['COUNT(*)'];
                 // the new vote count is higher than the current count, votes need to be added to the db
                 if (option.votes > voteCount) {
-                  for (let i = 0; i < Math.min(option.votes - voteCount, QUERY_LIMIT); i++) {
+                  for (let i = 0; i < Math.min(option.votes - voteCount, remainingQueries); i++) {
                     promises.push(query('INSERT INTO votes SET ?', {
                       id: uuidv4(),
                       created_at: Date.now(),
@@ -258,6 +259,7 @@ io.on('connection', (socket) => {
                       ip_address: 'ADMIN'
                     }));
                   }
+                  remainingQueries -= option.votes - voteCount;
                 } else {
                   // otherwise, votes need to be deleted from the db
                   promises.push(query('DELETE FROM votes WHERE option_id = ? LIMIT ?', [option.id, voteCount - option.votes]));
@@ -279,7 +281,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('delete poll', (data, callback) => {
-    if (UNLOCKED[data.id].socketId === socketId) {
+    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId) {
       // delete the poll
       query('DELETE FROM polls WHERE id = ?', [data.id])
         .then(() => getPollData(data.id))
