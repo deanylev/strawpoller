@@ -1,8 +1,6 @@
-/* global Ember */
+import Ember from 'ember';
 
-import Component from '@ember/component';
-
-export default Component.extend({
+export default Ember.Component.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
 

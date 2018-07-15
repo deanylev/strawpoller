@@ -1,8 +1,6 @@
-/* global Ember, d3pie */
+import Ember from 'ember';
 
-import Component from '@ember/component';
-
-export default Component.extend({
+export default Ember.Component.extend({
   socket: Ember.inject.service(),
 
   initialLoad: false,
@@ -14,20 +12,6 @@ export default Component.extend({
   handleData: null,
   join: null,
 
-  pie: null,
-  pieData: Ember.computed('options.@each.votes', function() {
-    return this.get('options').map((option) => ({
-      label: option.name,
-      value: option.votes
-    }));
-  }),
-
-  votesDidChange: Ember.observer('options.@each.votes', function() {
-    if (this.get('pie')) {
-      this.get('pie').updateProp('data.content', this.get('pieData'));
-    }
-  }),
-
   init() {
     this._super(...arguments);
 
@@ -36,20 +20,6 @@ export default Component.extend({
       this.set('allowEditing', data.allow_editing);
       this.set('options', data.options);
       if (!this.get('initialLoad')) {
-        const pie = new d3pie('pie', {
-          effects: {
-            load: {
-              effect: 'none'
-            },
-            pullOutSegmentOnClick: {
-              effect: 'none'
-            },
-          },
-          data: {
-            content: this.get('pieData')
-          }
-        });
-        this.set('pie', pie);
         this.set('initialLoad', true);
       }
     });

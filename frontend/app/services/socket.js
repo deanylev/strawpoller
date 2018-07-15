@@ -1,7 +1,6 @@
-import Service from '@ember/service';
 import config from '../config/environment';
 
-export default Service.extend({
+export default Ember.Service.extend({
   socket: null,
   connected: false,
   disconnected: Ember.computed.not('connected'),
@@ -16,15 +15,19 @@ export default Service.extend({
   },
 
   sendFrame(name, data) {
-    return new Ember.RSVP.Promise((resolve, reject) => {
-      this.get('socket').emit(name, data, (success, serverData) => {
-        if (success) {
-          resolve(serverData);
-        } else {
-          reject(serverData);
-        }
+    if (this.get('connected')) {
+      return new Ember.RSVP.Promise((resolve, reject) => {
+        this.get('socket').emit(name, data, (success, serverData) => {
+          if (success) {
+            resolve(serverData);
+          } else {
+            reject(serverData);
+          }
+        });
       });
-    });
+    } else {
+      return Ember.RSVP.resolve();
+    }
   },
 
   registerListener(name, callback) {
