@@ -45,39 +45,67 @@ app.use(express.static('public'));
 
 // create DB tables
 
-[
-  'CREATE TABLE IF NOT EXISTS options ( \
-  id varchar(36) NOT NULL, \
-  created_at bigint(13) NOT NULL, \
-  updated_at bigint(13) NOT NULL, \
-  poll_id varchar(36) NOT NULL, \
-  name varchar(255) NOT NULL, \
-  PRIMARY KEY (id), \
-  UNIQUE KEY id_UNIQUE (id) \
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+const createTable = (name, columns, updatedAt = true) => {
+  let columnsQuery = '';
 
-  'CREATE TABLE IF NOT EXISTS polls ( \
-  id varchar(36) NOT NULL, \
-  created_at bigint(13) NOT NULL, \
-  updated_at bigint(13) NOT NULL, \
-  ip_address varchar(45) NOT NULL, \
-  topic mediumtext NOT NULL, \
-  public tinyint(1) NOT NULL, \
-  allow_editing tinyint(1) NOT NULL, \
-  edit_password varchar(255) NOT NULL, \
-  PRIMARY KEY (id), \
-  UNIQUE KEY id_UNIQUE (id) \
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+  columns.forEach((column) => columnsQuery += `${column.name} ${column.type} ${column.allowNull ? '' : 'NOT NULL'},`);
 
-  'CREATE TABLE IF NOT EXISTS votes ( \
-  id varchar(36) NOT NULL, \
-  created_at bigint(13) NOT NULL, \
-  option_id varchar(36) NOT NULL, \
-  ip_address varchar(45) NOT NULL, \
-  PRIMARY KEY (id), \
-  UNIQUE KEY id_UNIQUE (id) \
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
-].forEach((sql) => query(sql));
+  query(`
+    CREATE TABLE IF NOT EXISTS ${name} (
+      id varchar(36) NOT NULL,
+      created_at bigint(13) NOT NULL,
+      ${updatedAt ? 'updated_at bigint(13) NOT NULL,' : ''}
+      ${columnsQuery}
+      PRIMARY KEY (id),
+      UNIQUE KEY id_UNIQUE (id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+};
+
+createTable('options', [
+  {
+    name: 'poll_id',
+    type: 'varchar(36)'
+  },
+  {
+    name: 'name',
+    type: 'varchar(255)'
+  }
+]);
+
+createTable('polls', [
+  {
+    name: 'ip_address',
+    type: 'varchar(45)'
+  },
+  {
+    name: 'topic',
+    type: 'mediumtext'
+  },
+  {
+    name: 'public',
+    type: 'tinyint(1)'
+  },
+  {
+    name: 'allow_editing',
+    type: 'tinyint(1)'
+  },
+  {
+    name: 'edit_password',
+    type: 'varchar(255)'
+  }
+]);
+
+createTable('votes', [
+  {
+    name: 'option_id',
+    type: 'varchar(36)'
+  },
+  {
+    name: 'ip_address',
+    type: 'varchar(45)'
+  }
+], false);
 
 http.listen(PORT, () => console.log('listening on port', PORT));
 
