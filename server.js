@@ -349,6 +349,7 @@ io.on('connection', (socket) => {
       query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [data.id, clientIp])
     ]).then((values) => {
       const pollId = values[0][0].poll_id;
+      // announce
       getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData));
     });
   });

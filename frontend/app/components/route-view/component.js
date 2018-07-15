@@ -80,11 +80,29 @@ export default Component.extend({
   },
 
   actions: {
-    vote(optionId) {
-      const option = this.get('options').find((option) => option.id === optionId);
-      this.get('socket').sendFrame(option.selected ? 'remove vote' : 'add vote', {
-        id: optionId
-      }).then(() => Ember.set(option, 'selected', !option.selected));
+    addVote(option) {
+      const selectedOption = this.get('options').find((option) => option.selected);
+      Ember.setProperties(option, {
+        selected: true,
+        votes: option.votes + 1
+      });
+      Ember.setProperties(selectedOption, {
+        selected: false,
+        votes: selectedOption.votes - 1
+      });
+      this.get('socket').sendFrame('add vote', {
+        id: option.id
+      });
+    },
+
+    removeVote(option) {
+      Ember.setProperties(option, {
+        selected: false,
+        votes: option.votes - 1
+      });
+      this.get('socket').sendFrame('remove vote', {
+        id: option.id
+      });
     }
   }
 });
