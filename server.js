@@ -98,6 +98,10 @@ createTable('polls', [
 
 createTable('votes', [
   {
+    name: 'poll_id',
+    type: 'varchar(36)'
+  },
+  {
     name: 'option_id',
     type: 'varchar(36)'
   },
@@ -109,7 +113,10 @@ createTable('votes', [
 
 http.listen(PORT, () => console.log('listening on port', PORT));
 
+// keeps track of what polls are unlocked for editing to which users
 const UNLOCKED = {};
+// queues up votes so they are processed serially
+const VOTE_QUEUES = {};
 
 io.on('connection', (socket) => {
   // Cloudflare messes with the connecting IP
@@ -165,6 +172,51 @@ io.on('connection', (socket) => {
         })) : []
       };
     });
+  };
+
+  const processVotes = (pollId, recursive) => {
+    const queue = VOTE_QUEUES[pollId];
+
+    if (queue.processing && !recursive) {
+      return;
+    }
+
+    queue.processing = true;
+
+    const { votes } = queue;
+    const vote = votes.shift();
+    const { type } = vote;
+    if (type === 'add') {
+      query('SELECT id FROM options WHERE poll_id = ?', [pollId])
+        // delete any existing votes from the same ip to prevent duplicates
+        .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
+        // add the new vote
+        .then(() => query('INSERT INTO votes SET ?', {
+          id: uuidv4(),
+          created_at: Date.now(),
+          poll_id: pollId,
+          option_id: vote.optionId,
+          ip_address: clientIp
+        })).then(() => {
+          if (votes.length) {
+            processVotes(pollId, true);
+          } else {
+            queue.processing = false;
+            // announce when finished
+            getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData))
+          }
+        });
+    } else if (type === 'remove') {
+      query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [vote.optionId, clientIp]).then((values) => {
+        if (votes.length) {
+          processVotes(pollId, true);
+        } else {
+          queue.processing = false;
+          // announce when finished
+          getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData))
+        }
+      });
+    }
   };
 
   socket.on('get public polls', (data, callback) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC').then((polls) => {
@@ -283,6 +335,7 @@ io.on('connection', (socket) => {
                     promises.push(query('INSERT INTO votes SET ?', {
                       id: uuidv4(),
                       created_at: Date.now(),
+                      poll_id: data.id,
                       option_id: option.id,
                       ip_address: 'ADMIN'
                     }));
@@ -323,35 +376,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('add vote', (data) => {
-    let pollId = null;
-    query('SELECT poll_id FROM options WHERE id = ?', [data.id])
-      .then((options) => {
-        pollId = options[0].poll_id;
-        return query('SELECT id FROM options WHERE poll_id = ?', [pollId])
-      })
-      // delete any existing votes from the same ip to prevent duplicates
-      .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
-      // add the new vote
-      .then(() => query('INSERT INTO votes SET ?', {
-        id: uuidv4(),
-        created_at: Date.now(),
-        option_id: data.id,
-        ip_address: clientIp
-      }))
-      // announce
-      .then(() => getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData)));
-  });
-
-  socket.on('remove vote', (data) => {
-    Promise.all([
-      query('SELECT poll_id FROM options WHERE id = ?', [data.id]),
-      query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [data.id, clientIp])
-    ]).then((values) => {
-      const pollId = values[0][0].poll_id;
-      // announce
-      getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData));
-    });
+  socket.on('vote', (data) => {
+    const { pollId } = data;
+    delete data.pollId;
+    VOTE_QUEUES[pollId] = VOTE_QUEUES[pollId] || {
+      processing: false,
+      votes: []
+    };
+    VOTE_QUEUES[pollId].votes.push(data);
+    processVotes(pollId);
   });
 });
 

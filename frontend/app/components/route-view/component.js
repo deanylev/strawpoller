@@ -52,16 +52,20 @@ export default Ember.Component.extend({
   actions: {
     addVote(option) {
       const selectedOption = this.get('options').find((option) => option.selected);
+      if (selectedOption) {
+        Ember.setProperties(selectedOption, {
+          selected: false,
+          votes: selectedOption.votes - 1
+        });
+      }
       Ember.setProperties(option, {
         selected: true,
         votes: option.votes + 1
       });
-      Ember.setProperties(selectedOption, {
-        selected: false,
-        votes: selectedOption.votes - 1
-      });
-      this.get('socket').sendFrame('add vote', {
-        id: option.id
+      this.get('socket').sendFrame('vote', {
+        type: 'add',
+        pollId: this.get('poll_id'),
+        optionId: option.id
       });
     },
 
@@ -70,8 +74,10 @@ export default Ember.Component.extend({
         selected: false,
         votes: option.votes - 1
       });
-      this.get('socket').sendFrame('remove vote', {
-        id: option.id
+      this.get('socket').sendFrame('vote', {
+        type: 'remove',
+        pollId: this.get('poll_id'),
+        optionId: option.id
       });
     }
   }
