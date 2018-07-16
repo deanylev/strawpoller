@@ -3,7 +3,7 @@
   <h2>{{topic}}</h2>
   <br>
   {{#each options as |option|}}
-    <div class="vote text-light {{if option.selected "bg-success" "bg-dark"}}" {{action (if option.selected "removeVote" "addVote") option on="click"}}>
+    <div class="vote text-light {{if option.selected "bg-success" "bg-dark"}} {{if waitingForResponse "disabled"}}" {{action (if option.selected "removeVote" "addVote") option on="click"}}>
       <h5>{{option.name}}</h5>
       <p>{{option.votes}} votes</p>
     </div>

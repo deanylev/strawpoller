@@ -12,10 +12,18 @@ export default Ember.Component.extend({
   handleData: null,
   join: null,
 
+  waitingForResponse: false,
+
   init() {
     this._super(...arguments);
 
     this.set('handleData', (data) => {
+      this.setProperties({
+        topic: data.topic,
+        allowEditing: data.allow_editing,
+        options: data.options,
+        waitingForResponse: false
+      });
       this.set('topic', data.topic);
       this.set('allowEditing', data.allow_editing);
       this.set('options', data.options);
@@ -51,6 +59,12 @@ export default Ember.Component.extend({
 
   actions: {
     addVote(option) {
+      if (this.get('waitingForResponse')) {
+        return;
+      }
+
+      this.set('waitingForResponse', true);
+
       const selectedOption = this.get('options').find((option) => option.selected);
       if (selectedOption) {
         Ember.setProperties(selectedOption, {
@@ -70,6 +84,12 @@ export default Ember.Component.extend({
     },
 
     removeVote(option) {
+      if (this.get('waitingForResponse')) {
+        return;
+      }
+
+      this.set('waitingForResponse', true);
+
       Ember.setProperties(option, {
         selected: false,
         votes: option.votes - 1
