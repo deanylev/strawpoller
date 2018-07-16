@@ -15,19 +15,15 @@ export default Ember.Service.extend({
   },
 
   sendFrame(name, data) {
-    if (this.get('connected')) {
-      return new Ember.RSVP.Promise((resolve, reject) => {
-        this.get('socket').emit(name, data, (success, serverData) => {
-          if (success) {
-            resolve(serverData);
-          } else {
-            reject(serverData);
-          }
-        });
+    return new Ember.RSVP.Promise((resolve, reject) => {
+      this.get('socket').emit(name, data, (success, serverData) => {
+        if (success) {
+          resolve(serverData);
+        } else {
+          reject(serverData);
+        }
       });
-    } else {
-      return Ember.RSVP.resolve();
-    }
+    });
   },
 
   registerListener(name, callback) {
