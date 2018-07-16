@@ -295,10 +295,6 @@ io.on('connection', (socket) => {
       if (data.edit_password) {
         dbData.edit_password = passwordHash.generate(data.edit_password);
       }
-      // hack to keep MySQL happy
-      if (!data.removed_options.length) {
-        data.removed_options.push(uuidv4());
-      }
       let currentOptions = null;
       let newOptions = null;
       query('SELECT id FROM options WHERE poll_id = ?', [data.id]).then((options) => {
@@ -307,7 +303,7 @@ io.on('connection', (socket) => {
           return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
         })
         // delete options from before that have been removed
-        .then(() => query('DELETE FROM options WHERE id IN (?)', [data.removed_options]))
+        .then(() => data.removed_options.length ? query('DELETE FROM options WHERE id IN (?)', [data.removed_options]) : Promise.resolve())
         // change names of options from before
         .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
           updated_at: Date.now(),
