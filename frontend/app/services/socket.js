@@ -4,6 +4,7 @@ export default Ember.Service.extend({
   socket: null,
   connected: false,
   disconnected: Ember.computed.not('connected'),
+  initialConnection: false,
 
   publicPolls: null,
 
@@ -12,6 +13,7 @@ export default Ember.Service.extend({
       this.getPublicPolls().then((publicPolls) => this.setProperties({
         publicPolls
       }));
+      this.set('initialConnection', true);
     }
   }),
 

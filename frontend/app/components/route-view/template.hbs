@@ -11,9 +11,6 @@
     <br>
     <h5>{{#link-to "edit" poll_id class="text-dark"}}Edit Poll{{/link-to}}</h5>
   {{/liquid-if}}
-{{else if socket.disconnected}}
-  <h2>Connecting...</h2>
 {{else}}
   <h2>Loading...</h2>
 {{/if}}
-<br>
