@@ -115,22 +115,20 @@ http.listen(PORT, () => console.log('listening on port', PORT));
 
 // keeps track of what polls are unlocked for editing to which users
 const UNLOCKED = {};
-// queues up votes so they are processed serially
-const VOTE_QUEUES = {};
 
 io.on('connection', (socket) => {
   // Cloudflare messes with the connecting IP
-  const clientIp = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
-  const socketId = socket.id;
+  const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
+  const SOCKET_ID = socket.id;
   console.log('client connected', {
-    id: socketId,
-    ip: clientIp
+    id: SOCKET_ID,
+    ip: CLIENT_IP
   });
 
   socket.on('disconnect', () => {
     console.log('client disconnected', {
-      id: socketId,
-      clientIp
+      id: SOCKET_ID,
+      ip: CLIENT_IP
     });
   });
 
@@ -153,7 +151,7 @@ io.on('connection', (socket) => {
         });
       });
 
-      return query('SELECT option_id FROM votes WHERE ip_address = ?', [clientIp]).then((votes) => {
+      return query('SELECT option_id FROM votes WHERE ip_address = ?', [CLIENT_IP]).then((votes) => {
         votes.forEach((vote) => {
           const option = options.find((option) => option.id === vote.option_id);
           if (option) {
@@ -174,51 +172,6 @@ io.on('connection', (socket) => {
     });
   };
 
-  const processVotes = (pollId, recursive) => {
-    const queue = VOTE_QUEUES[pollId];
-
-    if (queue.processing && !recursive) {
-      return;
-    }
-
-    queue.processing = true;
-
-    const { votes } = queue;
-    const vote = votes.shift();
-    const { type } = vote;
-    if (type === 'add') {
-      query('SELECT id FROM options WHERE poll_id = ?', [pollId])
-        // delete any existing votes from the same ip to prevent duplicates
-        .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, clientIp]))))
-        // add the new vote
-        .then(() => query('INSERT INTO votes SET ?', {
-          id: uuidv4(),
-          created_at: Date.now(),
-          poll_id: pollId,
-          option_id: vote.optionId,
-          ip_address: clientIp
-        })).then(() => {
-          if (votes.length) {
-            processVotes(pollId, true);
-          } else {
-            queue.processing = false;
-            // announce when finished
-            getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData))
-          }
-        });
-    } else if (type === 'remove') {
-      query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [vote.optionId, clientIp]).then((values) => {
-        if (votes.length) {
-          processVotes(pollId, true);
-        } else {
-          queue.processing = false;
-          // announce when finished
-          getPollData(pollId).then((pollData) => io.to(pollId).emit('poll data', pollData))
-        }
-      });
-    }
-  };
-
   socket.on('get public polls', (data, callback) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC').then((polls) => {
     callback(true, polls);
   }));
@@ -231,7 +184,7 @@ io.on('connection', (socket) => {
         id,
         created_at: Date.now(),
         updated_at: Date.now(),
-        ip_address: clientIp,
+        ip_address: CLIENT_IP,
         topic: emojiStrip(data.topic),
         public: data.public ? 1 : 0,
         allow_editing: data.allow_editing ? 1 : 0,
@@ -260,7 +213,7 @@ io.on('connection', (socket) => {
         if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === MASTER_PASS) {
           const admin = data.password === MASTER_PASS;
           UNLOCKED[data.id] = {
-            socketId,
+            socketId: SOCKET_ID,
             admin
           };
           // return data to client requesting it
@@ -282,7 +235,7 @@ io.on('connection', (socket) => {
 
   socket.on('save poll', (data, callback) => {
     // match client-side validation
-    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId && data.topic && data.options.filter((option) => option.name.trim()).length >= 2) {
+    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID && data.topic && data.options.filter((option) => option.name.trim()).length >= 2) {
       const dbData = {
         updated_at: Date.now(),
         topic: emojiStrip(data.topic),
@@ -358,7 +311,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('delete poll', (data, callback) => {
-    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId) {
+    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID) {
       // delete the poll
       query('DELETE FROM polls WHERE id = ?', [data.id])
         .then(() => getPollData(data.id))
@@ -373,15 +326,34 @@ io.on('connection', (socket) => {
   });
 
   socket.on('vote', (data, callback) => {
-    const { pollId } = data;
-    delete data.pollId;
-    VOTE_QUEUES[pollId] = VOTE_QUEUES[pollId] || {
-      processing: false,
-      votes: []
-    };
-    VOTE_QUEUES[pollId].votes.push(data);
-    processVotes(pollId);
-    callback(true);
+    const { type, pollId, optionId } = data;
+    if (type === 'add') {
+      query('SELECT id FROM options WHERE poll_id = ?', [pollId])
+        // delete any existing votes from the same ip to prevent duplicates
+        .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [option.id, CLIENT_IP]))))
+        // add the new vote
+        .then(() => query('INSERT INTO votes SET ?', {
+          id: uuidv4(),
+          created_at: Date.now(),
+          poll_id: pollId,
+          option_id: optionId,
+          ip_address: CLIENT_IP
+        })).then(() => {
+          getPollData(pollId).then((pollData) => {
+            // announce
+            io.to(pollId).emit('poll data', pollData);
+            callback(true);
+          });
+        });
+    } else if (type === 'remove') {
+      query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [optionId, CLIENT_IP]).then(() => getPollData(pollId).then((pollData) => {
+        // announce
+        io.to(pollId).emit('poll data', pollData);
+        callback(true);
+      }));
+    } else {
+      callback(false);
+    }
   });
 });
 

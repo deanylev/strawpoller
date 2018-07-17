@@ -53,16 +53,9 @@ export default Ember.Component.extend({
 
   actions: {
     vote(option) {
+      const type = option.selected ? 'remove': 'add';
       this.set('inFlight', true);
-      return new Ember.RSVP.Promise((resolve, reject) => {
-        let func = option.selected ? 'removeVote': 'addVote';
-        this.get('socket')[func](this.get('poll_id'), option.id).then(() => {
-          // make a best effort to wait for the vote queue to be processed
-          this.get('socket').registerOnce('poll data', resolve);
-          // but only wait 3 seconds for the sake of UX
-          setTimeout(resolve, 3000);
-        });
-      }).then(() => this.set('inFlight', false));
+      return this.get('socket').vote(type, this.get('poll_id'), option.id).then(() => this.set('inFlight', false));
     }
   }
 });

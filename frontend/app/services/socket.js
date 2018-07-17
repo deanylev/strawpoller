@@ -60,17 +60,9 @@ export default Ember.Service.extend({
     });
   },
 
-  addVote(pollId, optionId) {
+  vote(type, pollId, optionId) {
     return this._sendFrame('vote', {
-      type: 'add',
-      pollId,
-      optionId
-    });
-  },
-
-  removeVote(pollId, optionId) {
-    return this._sendFrame('vote', {
-      type: 'remove',
+      type,
       pollId,
       optionId
     });
