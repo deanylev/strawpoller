@@ -10,6 +10,7 @@ Router.map(function() {
   this.route('create', {
     path: '/'
   });
+  this.route('public');
   this.route('view', {
     path: '/view/:poll_id'
   });

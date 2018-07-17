@@ -13,7 +13,7 @@ export default Ember.Component.extend({
     // topic can't be blank
     return !(this.get('topic')
     // must have at least two options that aren't blank
-    && this.get('options').filter((option) => option.name).length >= 2
+    && this.get('options').filter((option) => option.name.trim()).length >= 2
     // password can't be blank if allowing editing
     && (this.get('editPassword') || !this.get('allowEditing'))
     // must be connected to the server
@@ -22,13 +22,21 @@ export default Ember.Component.extend({
 
   publicPolls: [],
 
+  allowEditingDidChange: Ember.observer('allowEditing', function() {
+    this.set('editPassword', '');
+  }),
+
   init() {
     this._super(...arguments);
 
-    this.set('options', []);
-    this.get('socket').getPublicPolls().then((publicPolls) => this.setProperties({
-      publicPolls
-    }));
+    this.set('options', [
+      {
+        name: ''
+      },
+      {
+        name: ''
+      }
+    ]);
   },
 
   actions: {

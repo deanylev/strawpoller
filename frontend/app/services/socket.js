@@ -5,6 +5,16 @@ export default Ember.Service.extend({
   connected: false,
   disconnected: Ember.computed.not('connected'),
 
+  publicPolls: null,
+
+  connectedDidChange: Ember.observer('connected', function() {
+    if (this.get('connected')) {
+      this.getPublicPolls().then((publicPolls) => this.setProperties({
+        publicPolls
+      }));
+    }
+  }),
+
   init() {
     this._super(...arguments);
 

@@ -1,3 +1,5 @@
+<h1>Edit Poll</h1>
+<br>
 <form>
   {{#if unlocked}}
     <div class="form-group">
@@ -46,7 +48,7 @@
     <br><br>
     {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "savePoll") disabled=disabled}}Save{{/spin-button}}
     {{#spin-button class="btn btn-danger btn-block btn-lg" buttonStyle="zoom-out" action=(action "deletePoll") disabled=socket.disconnected}}Delete Poll{{/spin-button}}
-    <br>
+    <br><br>
   {{else}}
     {{input class="form-control" type="password" value=password placeholder="Enter the edit password"}}
     <br>
@@ -54,5 +56,6 @@
     {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not password) socket.disconnected)}}Submit{{/spin-button}}
     <br>
     <h5>{{#link-to "view" poll_id class="text-dark"}}View Poll{{/link-to}}</h5>
+    <br>
   {{/if}}
 </form>

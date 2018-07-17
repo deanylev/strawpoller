@@ -20,7 +20,7 @@ export default Ember.Component.extend({
     // topic can't be blank
     return !(this.get('topic')
     // must have at least two options that aren't blank
-    && this.get('options').concat(this.get('newOptions')).filter((option) => option.name).length >= 2
+    && this.get('options').concat(this.get('newOptions')).filter((option) => option.name.trim()).length >= 2
     // must be connected to the server
     && this.get('socket.connected'));
   }),

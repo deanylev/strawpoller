@@ -226,7 +226,7 @@ io.on('connection', (socket) => {
   socket.on('create poll', (data, callback) => {
     const id = uuidv4();
     // match client-side validation
-    if (data.topic && data.options.length >= 2 && (data.edit_password || !data.allow_editing)) {
+    if (data.topic && data.options.filter((option) => option.name.trim()).length >= 2 && (data.edit_password || !data.allow_editing)) {
       query('INSERT INTO polls SET ?', {
         id,
         created_at: Date.now(),
@@ -282,7 +282,7 @@ io.on('connection', (socket) => {
 
   socket.on('save poll', (data, callback) => {
     // match client-side validation
-    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId && data.topic && data.options.length >= 2) {
+    if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId && data.topic && data.options.filter((option) => option.name.trim()).length >= 2) {
       const dbData = {
         updated_at: Date.now(),
         topic: emojiStrip(data.topic),
