@@ -3,10 +3,10 @@
   <h2>{{topic}}</h2>
   <br>
   {{#each options as |option|}}
-    <div class="vote text-light {{if option.selected "bg-success" "bg-dark"}} {{if waitingForResponse "disabled"}}" {{action (if option.selected "removeVote" "addVote") option on="click"}}>
+    {{#spin-button class=(concat "btn btn-block btn-" (if option.selected "success" "dark")) buttonStyle="zoom-out" action=(action "vote" option)}}
       <h5>{{option.name}}</h5>
       <p>{{option.votes}} votes</p>
-    </div>
+    {{/spin-button}}
   {{/each}}
   {{#liquid-if allowEditing}}
     <br>

@@ -12,8 +12,6 @@ export default Ember.Component.extend({
   handleData: null,
   join: null,
 
-  waitingForResponse: false,
-
   init() {
     this._super(...arguments);
 
@@ -52,39 +50,13 @@ export default Ember.Component.extend({
   },
 
   actions: {
-    addVote(option) {
-      if (this.get('waitingForResponse')) {
-        return;
-      }
-
-      this.set('waitingForResponse', true);
-
-      const selectedOption = this.get('options').find((option) => option.selected);
-      if (selectedOption) {
-        Ember.setProperties(selectedOption, {
-          selected: false,
-          votes: selectedOption.votes - 1
+    vote(option) {
+      return new Ember.RSVP.Promise((resolve, reject) => {
+        let func = option.selected ? 'removeVote': 'addVote';
+        this.get('socket')[func](this.get('poll_id'), option.id).then(() => {
+          this.get('socket').registerOnce('poll data', resolve);
         });
-      }
-      Ember.setProperties(option, {
-        selected: true,
-        votes: option.votes + 1
       });
-      this.get('socket').addVote(this.get('poll_id'), option.id);
-    },
-
-    removeVote(option) {
-      if (this.get('waitingForResponse')) {
-        return;
-      }
-
-      this.set('waitingForResponse', true);
-
-      Ember.setProperties(option, {
-        selected: false,
-        votes: option.votes - 1
-      });
-      this.get('socket').removeVote(this.get('poll_id'), option.id);
     }
   }
 });

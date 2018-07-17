@@ -372,7 +372,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('vote', (data) => {
+  socket.on('vote', (data, callback) => {
     const { pollId } = data;
     delete data.pollId;
     VOTE_QUEUES[pollId] = VOTE_QUEUES[pollId] || {
@@ -381,6 +381,7 @@ io.on('connection', (socket) => {
     };
     VOTE_QUEUES[pollId].votes.push(data);
     processVotes(pollId);
+    callback(true);
   });
 });
 

@@ -34,6 +34,10 @@ export default Ember.Service.extend({
     this.get('socket').off(name, callback);
   },
 
+  registerOnce(name, callback) {
+    this.get('socket').once(name, callback);
+  },
+
   joinPoll(id) {
     return this._sendFrame('join poll', {
       id
