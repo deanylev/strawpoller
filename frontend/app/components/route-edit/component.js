@@ -33,10 +33,7 @@ export default Ember.Component.extend({
 
   actions: {
     submitPassword() {
-      return this.get('socket').sendFrame('unlock poll', {
-        id: this.get('poll_id'),
-        password: this.get('password')
-      }).then((data) => {
+      return this.get('socket').unlockPoll(this.get('poll_id'), this.get('password')).then((data) => {
         this.set('admin', data.admin);
         this.set('topic', data.topic);
         this.set('public', data.public);
@@ -61,11 +58,11 @@ export default Ember.Component.extend({
     },
 
     savePoll() {
-      return this.get('socket').sendFrame('edit poll', {
+      return this.get('socket').savePoll({
         id: this.get('poll_id'),
         topic: this.get('topic'),
-        public: this.get('public') ? 1 : 0,
-        allow_editing: this.get('allowEditing') ? 1 : 0,
+        public: this.get('public'),
+        allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
         options: this.get('options').filter((option) => option.name).concat(this.get('newOptions').filter((option) => option.name)),
         removed_options: this.get('removedOptions')
@@ -74,9 +71,7 @@ export default Ember.Component.extend({
 
     deletePoll() {
       if (confirm('Are you sure? This cannot be undone.')) {
-        return this.get('socket').sendFrame('delete poll', {
-          id: this.get('poll_id')
-        }).then(() => this.get('router').transitionTo('create'));
+        this.get('socket').deletePoll(this.get('poll_id')).then(() => this.get('router').transitionTo('create'));
       } else {
         return Ember.RSVP.reject();
       }

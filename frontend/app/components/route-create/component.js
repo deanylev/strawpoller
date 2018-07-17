@@ -26,9 +26,9 @@ export default Ember.Component.extend({
     this._super(...arguments);
 
     this.set('options', []);
-    this.get('socket').sendFrame('get public polls').then((publicPolls) => {
-      this.set('publicPolls', publicPolls);
-    });
+    this.get('socket').getPublicPolls().then((publicPolls) => this.setProperties({
+      publicPolls
+    }));
   },
 
   actions: {
@@ -43,15 +43,13 @@ export default Ember.Component.extend({
     },
 
     createPoll() {
-      return this.get('socket').sendFrame('create poll', {
+      return this.get('socket').createPoll({
         topic: this.get('topic'),
-        public: this.get('public') ? 1 : 0,
-        allow_editing: this.get('allowEditing') ? 1 : 0,
+        public: this.get('public'),
+        allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
         options: this.get('options').filter((option) => option.name)
-      }).then((data) => {
-        this.get('router').transitionTo('view', data.id);
-      });
+      }).then((data) => this.get('router').transitionTo('view', data.id));
     }
   }
 });

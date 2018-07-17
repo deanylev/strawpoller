@@ -32,11 +32,7 @@ export default Ember.Component.extend({
       }
     });
 
-    this.set('join', () => {
-      this.get('socket').sendFrame('join poll', {
-        id: this.get('poll_id')
-      });
-    });
+    this.set('join', () => this.get('socket').joinPoll(this.get('poll_id')));
 
     this.join();
 
@@ -50,9 +46,7 @@ export default Ember.Component.extend({
     this.get('socket').unregisterListener('connect', this.join);
 
     // unsubscribe from the room
-    this.get('socket').sendFrame('leave poll', {
-      id: this.get('poll_id')
-    });
+    this.get('socket').leavePoll(this.get('poll_id'))
 
     this._super(...arguments);
   },
@@ -76,11 +70,7 @@ export default Ember.Component.extend({
         selected: true,
         votes: option.votes + 1
       });
-      this.get('socket').sendFrame('vote', {
-        type: 'add',
-        pollId: this.get('poll_id'),
-        optionId: option.id
-      });
+      this.get('socket').addVote(this.get('poll_id'), option.id);
     },
 
     removeVote(option) {
@@ -94,11 +84,7 @@ export default Ember.Component.extend({
         selected: false,
         votes: option.votes - 1
       });
-      this.get('socket').sendFrame('vote', {
-        type: 'remove',
-        pollId: this.get('poll_id'),
-        optionId: option.id
-      });
+      this.get('socket').removeVote(this.get('poll_id'), option.id);
     }
   }
 });

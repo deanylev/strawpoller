@@ -10,11 +10,11 @@ export default Ember.Service.extend({
 
     this.set('socket', io(config.APP.SOCKET_HOST));
 
-    this.get('socket').on('connect', () => this.set('connected', true));
-    this.get('socket').on('disconnect', () => this.set('connected', false));
+    this.registerListener('connect', () => this.set('connected', true));
+    this.registerListener('disconnect', () => this.set('connected', false));
   },
 
-  sendFrame(name, data) {
+  _sendFrame(name, data) {
     return new Ember.RSVP.Promise((resolve, reject) => {
       this.get('socket').emit(name, data, (success, serverData) => {
         if (success) {
@@ -32,5 +32,58 @@ export default Ember.Service.extend({
 
   unregisterListener(name, callback) {
     this.get('socket').off(name, callback);
+  },
+
+  joinPoll(id) {
+    return this._sendFrame('join poll', {
+      id
+    });
+  },
+
+  leavePoll(id) {
+    return this._sendFrame('leave poll', {
+      id
+    });
+  },
+
+  addVote(pollId, optionId) {
+    return this._sendFrame('vote', {
+      type: 'add',
+      pollId,
+      optionId
+    });
+  },
+
+  removeVote(pollId, optionId) {
+    return this._sendFrame('vote', {
+      type: 'remove',
+      pollId,
+      optionId
+    });
+  },
+
+  unlockPoll(id, password) {
+    return this._sendFrame('unlock poll', {
+      id,
+      password
+    });
+  },
+
+  createPoll(data) {
+    return this._sendFrame('create poll', data);
+  },
+
+  savePoll(data) {
+    return this._sendFrame('save poll', data);
+  },
+
+  deletePoll(id) {
+    return this._sendFrame('delete poll', {
+      id
+    });
+  },
+
+  getPublicPolls() {
+    return this._sendFrame('get public polls');
   }
 });

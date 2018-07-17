@@ -233,8 +233,8 @@ io.on('connection', (socket) => {
         updated_at: Date.now(),
         ip_address: clientIp,
         topic: emojiStrip(data.topic),
-        public: data.public,
-        allow_editing: data.allow_editing,
+        public: data.public ? 1 : 0,
+        allow_editing: data.allow_editing ? 1 : 0,
         edit_password: passwordHash.generate(data.edit_password || uuidv4())
       }).then(() => Promise.all(data.options.map((option) => query('INSERT INTO options SET ?', {
         id: uuidv4(),
@@ -280,17 +280,17 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('edit poll', (data, callback) => {
+  socket.on('save poll', (data, callback) => {
     // match client-side validation
     if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === socketId && data.topic && data.options.length >= 2) {
       const dbData = {
         updated_at: Date.now(),
         topic: emojiStrip(data.topic),
-        public: data.public
+        public: data.public ? 1 : 0
       };
       // only allow admins to change allow_editing prop
       if (UNLOCKED[data.id] && UNLOCKED[data.id].admin) {
-        dbData.allow_editing = data.allow_editing;
+        dbData.allow_editing = data.allow_editing ? 1 : 0;
       }
       if (data.edit_password) {
         dbData.edit_password = passwordHash.generate(data.edit_password);
