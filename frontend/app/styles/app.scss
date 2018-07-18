@@ -1,10 +1,12 @@
 @import "ember-cli-bootstrap-4/bootstrap";
 @import "spin-button";
 
-.link {
-  cursor: pointer;
-}
+.public-poll {
+  text-decoration: underline;
 
-.link:hover {
-  text-decoration: underline !important;
+  &:hover {
+    text-decoration: none;
+  }
+
+  @extend .text-dark;
 }
