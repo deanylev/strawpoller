@@ -1,3 +1,6 @@
+/* global io */
+
+import Ember from 'ember';
 import config from '../config/environment';
 
 export default Ember.Service.extend({
@@ -10,7 +13,10 @@ export default Ember.Service.extend({
 
   connectedDidChange: Ember.observer('connected', function() {
     if (this.get('connected')) {
-      this.set('initialConnection', true);
+      if (!localStorage.getItem('clientId')) {
+        localStorage.setItem('clientId', this.getClientId());
+      }
+      this.handshake(localStorage.getItem('clientId')).then(() => this.set('initialConnection', true));
     }
   }),
 
@@ -25,6 +31,17 @@ export default Ember.Service.extend({
     this.registerListener('public polls', (publicPolls) => this.setProperties({
       publicPolls
     }));
+  },
+
+  getClientId() {
+    let { navigator, screen } = window;
+    let guid = navigator.mimeTypes.length;
+    guid += navigator.userAgent.replace(/\D+/g, '');
+    guid += navigator.plugins.length;
+    guid += screen.height || '';
+    guid += screen.width || '';
+    guid += screen.pixelDepth || '';
+    return guid;
   },
 
   _sendFrame(name, data) {
@@ -49,6 +66,12 @@ export default Ember.Service.extend({
 
   registerOnce(name, callback) {
     this.get('socket').once(name, callback);
+  },
+
+  handshake(clientId) {
+    return this._sendFrame('handshake', {
+      clientId
+    });
   },
 
   joinPoll(id) {

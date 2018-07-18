@@ -1,5 +1,5 @@
-import Route from '@ember/routing/route';
+import Ember from 'ember';
 
-export default Route.extend({
-  socket: Ember.inject.service(),
+export default Ember.Route.extend({
+  socket: Ember.inject.service()
 });
