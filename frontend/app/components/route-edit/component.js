@@ -40,7 +40,7 @@ export default Ember.Component.extend({
         this.set('allowEditing', data.allow_editing);
         this.set('options', data.options);
         this.set('unlocked', true);
-      }).catch((data) => this.set('error', data.error));
+      }).catch((err) => this.set('error', err.reason));
     },
 
     addOption() {

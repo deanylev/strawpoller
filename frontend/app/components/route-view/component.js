@@ -55,7 +55,7 @@ export default Ember.Component.extend({
     vote(option) {
       const type = option.selected ? 'remove': 'add';
       this.set('inFlight', true);
-      return this.get('socket').vote(type, this.get('poll_id'), option.id).then(() => this.set('inFlight', false));
+      return this.get('socket').vote(type, this.get('poll_id'), option.id).finally(() => this.set('inFlight', false));
     }
   }
 });

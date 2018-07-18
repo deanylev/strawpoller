@@ -10,9 +10,6 @@ export default Ember.Service.extend({
 
   connectedDidChange: Ember.observer('connected', function() {
     if (this.get('connected')) {
-      this.getPublicPolls().then((publicPolls) => this.setProperties({
-        publicPolls
-      }));
       this.set('initialConnection', true);
     }
   }),
@@ -24,6 +21,10 @@ export default Ember.Service.extend({
 
     this.registerListener('connect', () => this.set('connected', true));
     this.registerListener('disconnect', () => this.set('connected', false));
+
+    this.registerListener('public polls', (publicPolls) => this.setProperties({
+      publicPolls
+    }));
   },
 
   _sendFrame(name, data) {

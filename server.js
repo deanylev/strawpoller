@@ -1,3 +1,6 @@
+// our libraries
+const Logger = require('./logger');
+
 // third party libraries
 const express = require('express');
 const uuidv4 = require('uuid/v4');
@@ -6,21 +9,19 @@ const emojiStrip = require('emoji-strip');
 const passwordHash = require('password-hash');
 
 // constants
-const PORT = process.env.PORT || 8080;
-const QUERY_LIMIT = process.env.QUERY_LIMIT || 1000;
-const { MASTER_PASS } = process.env;
+const {
+  PORT,
+  QUERY_LIMIT,
+  MASTER_PASS,
+  DB_CREDS
+} = require('./globals');
 
 // config
+const logger = new Logger();
 const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
-const pool = mysql.createPool({
-  connectionLimit: 5,
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || '',
-  database: process.env.DB_NAME || 'strawpoller'
-});
+const pool = mysql.createPool(DB_CREDS);
 
 // promise which resolves with the query results
 const query = (query, values) => {
@@ -111,7 +112,7 @@ createTable('votes', [
   }
 ], false);
 
-http.listen(PORT, () => console.log('listening on port', PORT));
+http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 
 // keeps track of what polls are unlocked for editing to which users
 const UNLOCKED = {};
@@ -120,13 +121,50 @@ io.on('connection', (socket) => {
   // Cloudflare messes with the connecting IP
   const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const SOCKET_ID = socket.id;
-  console.log('client connected', {
+  const sendFrame = (target, name, data) => {
+    logger.log('socket', 'sending frame', {
+      target,
+      name,
+      data
+    });
+
+    if (target === 'everyone') {
+      io.emit(name, data);
+    } else if (target === SOCKET_ID) {
+      socket.emit(name, data);
+    } else {
+      io.to(target).emit(name, data);
+    }
+  };
+  const registerListener = (name, callback) => {
+    socket.on(name, (data, ack) => {
+      let cleanData = {};
+      Object.keys(data || {}).forEach((key) => cleanData[key] = key === 'password' ? 'REDACTED' : data[key]);
+      logger.log('socket', 'received frame', {
+        socketId: SOCKET_ID,
+        name,
+        data: cleanData
+      });
+
+      function respond(success, data) {
+        ack(success, data);
+        logger[success ? 'log' : 'warn']('socket', `${success ? 'accepting' : 'rejecting'} frame`, Object.assign({
+          socketId: SOCKET_ID,
+          name
+        }, data || {}));
+      }
+
+      callback(data, respond);
+    });
+  };
+
+  logger.log('socket', 'client connected', {
     id: SOCKET_ID,
     ip: CLIENT_IP
   });
 
   socket.on('disconnect', () => {
-    console.log('client disconnected', {
+    logger.log('socket', 'client disconnected', {
       id: SOCKET_ID,
       ip: CLIENT_IP
     });
@@ -172,11 +210,13 @@ io.on('connection', (socket) => {
     });
   };
 
-  socket.on('get public polls', (data, callback) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC').then((polls) => {
-    callback(true, polls);
-  }));
+  // promise which resolves with a list of public polls
+  const sendPublicPolls = (target) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC')
+    .then((publicPolls) => sendFrame(target, 'public polls', publicPolls));
 
-  socket.on('create poll', (data, callback) => {
+  sendPublicPolls(SOCKET_ID);
+
+  registerListener('create poll', (data, respond) => {
     const id = uuidv4();
     // match client-side validation
     if (data.topic && data.options.filter((option) => option.name.trim()).length >= 2 && (data.edit_password || !data.allow_editing)) {
@@ -195,18 +235,24 @@ io.on('connection', (socket) => {
         updated_at: Date.now(),
         poll_id: id,
         name: emojiStrip(option.name)
-      })))).then(() => callback(true, {
+      })))).then(() => respond(true, {
         id
-      }));
+      })).then(() => {
+        if (data.public) {
+          sendPublicPolls('everyone');
+        }
+      });
     } else {
-      callback(false);
+      respond(false, {
+        reason: 'Invalid params.'
+      });
     }
   });
 
-  socket.on('join poll', (data) => getPollData(data.id).then((pollData) => socket.join(data.id, () => socket.emit('poll data', pollData))));
-  socket.on('leave poll', (data) => socket.leave(data.id));
+  registerListener('join poll', (data) => getPollData(data.id).then((pollData) => socket.join(data.id, () => sendFrame(SOCKET_ID, 'poll data', pollData))));
+  registerListener('leave poll', (data) => socket.leave(data.id));
 
-  socket.on('unlock poll', (data, callback) => {
+  registerListener('unlock poll', (data, respond) => {
     query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
       const poll = polls[0];
       if (poll) {
@@ -217,23 +263,23 @@ io.on('connection', (socket) => {
             admin
           };
           // return data to client requesting it
-          getPollData(data.id).then((pollData) => callback(true, Object.assign(pollData, {
+          getPollData(data.id).then((pollData) => respond(true, Object.assign(pollData, {
             admin
           })));
         } else {
-          callback(false, {
-            error: 'Password incorrect.'
+          respond(false, {
+            reason: 'Password incorrect.'
           });
         }
       } else {
-        callback(false, {
-          error: 'Poll not found.'
+        respond(false, {
+          reason: 'Poll not found.'
         });
       }
     });
   });
 
-  socket.on('save poll', (data, callback) => {
+  registerListener('save poll', (data, respond) => {
     // match client-side validation
     if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID && data.topic && data.options.filter((option) => option.name.trim()).length >= 2) {
       const dbData = {
@@ -302,30 +348,45 @@ io.on('connection', (socket) => {
         .then(() => getPollData(data.id))
         .then((pollData) => {
           // announce
-          io.to(data.id).emit('poll data', pollData);
-          callback(true);
+          sendFrame(data.id, 'poll data', pollData);
+          respond(true);
+
+          if (data.public) {
+            sendPublicPolls('everyone');
+          }
         });
     } else {
-      callback(false);
+      respond(false, {
+        reason: 'Invalid params.'
+      });
     }
   });
 
-  socket.on('delete poll', (data, callback) => {
+  registerListener('delete poll', (data, respond) => {
     if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID) {
-      // delete the poll
-      query('DELETE FROM polls WHERE id = ?', [data.id])
+      let isPublic = false;
+      query('SELECT public FROM polls WHERE id = ?', [data.id])
+        .then((polls) => {
+          isPublic = polls[0].public;
+          return query('DELETE FROM polls WHERE id = ?', [data.id])
+        })
         .then(() => getPollData(data.id))
         .then((pollData) => {
           // announce
-          io.to(data.id).emit('poll data', pollData);
-          callback(true);
+          if (isPublic) {
+            sendPublicPolls('everyone');
+          }
+          sendFrame(data.id, 'poll data', pollData);
+          respond(true);
         });
     } else {
-      callback(false);
+      respond(false, {
+        reason: 'Unauthorised.'
+      });
     }
   });
 
-  socket.on('vote', (data, callback) => {
+  registerListener('vote', (data, respond) => {
     const { type, pollId, optionId } = data;
     if (type === 'add') {
       query('SELECT id FROM options WHERE poll_id = ?', [pollId])
@@ -341,18 +402,20 @@ io.on('connection', (socket) => {
         })).then(() => {
           getPollData(pollId).then((pollData) => {
             // announce
-            io.to(pollId).emit('poll data', pollData);
-            callback(true);
+            sendFrame(pollId, 'poll data', pollData);
+            respond(true);
           });
         });
     } else if (type === 'remove') {
       query('DELETE FROM votes WHERE option_id = ? AND ip_address = ?', [optionId, CLIENT_IP]).then(() => getPollData(pollId).then((pollData) => {
         // announce
-        io.to(pollId).emit('poll data', pollData);
-        callback(true);
+        sendFrame(pollId, 'poll data', pollData);
+        respond(true);
       }));
     } else {
-      callback(false);
+      respond(false, {
+        reason: 'Invalid params.'
+      });
     }
   });
 });
