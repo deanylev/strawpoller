@@ -203,11 +203,9 @@ io.on('connection', (socket) => {
         allow_editing: poll ? !!poll.allow_editing : false,
         options: poll ? options.map((option) => Object.assign(option, {
           max: option.votes + QUERY_LIMIT
-        })) : []
+        })) : [],
+        selected
       };
-      if (selected.length) {
-        obj.selected = selected;
-      }
 
       return obj;
     });
