@@ -230,7 +230,7 @@ io.on('connection', (socket) => {
   });
 
   registerListener('handshake', (data, respond) => {
-    if (typeof data.clientId === 'string' && data.clientId.length >= 10) {
+    if (typeof data.clientId === 'string' && data.clientId.length === 32) {
       CLIENT_ID = data.clientId;
       respond(true);
       sendPublicPolls(SOCKET_ID);

@@ -13,10 +13,12 @@ export default Ember.Service.extend({
 
   connectedDidChange: Ember.observer('connected', function() {
     if (this.get('connected')) {
-      if (!localStorage.getItem('clientId')) {
-        localStorage.setItem('clientId', this.getClientId());
-      }
-      this.handshake(localStorage.getItem('clientId')).then(() => this.set('initialConnection', true));
+      this.getClientId().then((clientId) => {
+        if (!localStorage.getItem('clientId')) {
+          localStorage.setItem('clientId', clientId);
+        }
+        this.handshake(localStorage.getItem('clientId')).then(() => this.set('initialConnection', true));
+      });
     }
   }),
 
@@ -34,14 +36,9 @@ export default Ember.Service.extend({
   },
 
   getClientId() {
-    let { navigator, screen } = window;
-    let guid = navigator.mimeTypes.length;
-    guid += navigator.userAgent.replace(/\D+/g, '');
-    guid += navigator.plugins.length;
-    guid += screen.height || '';
-    guid += screen.width || '';
-    guid += screen.pixelDepth || '';
-    return guid;
+    return new Ember.RSVP.Promise((resolve, reject) => {
+      new Fingerprint2().get(resolve);
+    });
   },
 
   _sendFrame(name, data) {

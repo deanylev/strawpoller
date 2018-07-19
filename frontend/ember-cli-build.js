@@ -8,8 +8,7 @@ module.exports = function(defaults) {
   });
 
   app.import('vendor/socket.io.slim.js');
-  app.import('vendor/d3.min.js');
-  app.import('vendor/d3pie.min.js');
+  app.import('vendor/fingerprint2.min.js');
 
   // Use `app.import` to add additional libraries to the generated
   // output files.
