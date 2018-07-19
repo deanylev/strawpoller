@@ -173,7 +173,6 @@ io.on('connection', (socket) => {
       optionResults = results;
       return Promise.all(promises);
     }).then((values) => {
-      const getSelected = [];
       values.forEach((value, index) => {
         const { id } = optionResults[index];
         options.push({
