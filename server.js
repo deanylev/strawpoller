@@ -164,8 +164,9 @@ io.on('connection', (socket) => {
   };
 
   // promise which resolves with the topic, options and vote counts for a poll
-  const getPollData = (id) => {
+  const getPollData = (id, unique) => {
     const options = [];
+    const selected = [];
     let optionResults = null;
     return query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
       const promises = results.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
@@ -182,17 +183,21 @@ io.on('connection', (socket) => {
         });
       });
 
-      return query('SELECT option_id FROM votes WHERE client_id = ? AND ip_address = ?', [CLIENT_ID, CLIENT_IP]).then((votes) => {
-        votes.forEach((vote) => {
-          const option = options.find((option) => option.id === vote.option_id);
-          if (option) {
-            option.selected = true;
-          }
+      if (unique) {
+        return query('SELECT option_id FROM votes WHERE client_id = ? AND ip_address = ?', [CLIENT_ID, CLIENT_IP]).then((votes) => {
+          votes.forEach((vote) => {
+            const option = options.find((option) => option.id === vote.option_id);
+            if (option) {
+              selected.push(option.id);
+            }
+          });
         });
-      });
+      } else {
+        return Promise.resolve();
+      }
     }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id])).then((polls) => {
       const poll = polls[0];
-      return {
+      const obj = {
         topic: poll ? poll.topic : 'Poll not found.',
         public: poll ? !!poll.public : false,
         allow_editing: poll ? !!poll.allow_editing : false,
@@ -200,6 +205,11 @@ io.on('connection', (socket) => {
           max: option.votes + QUERY_LIMIT
         })) : []
       };
+      if (selected.length) {
+        obj.selected = selected;
+      }
+
+      return obj;
     });
   };
 
@@ -258,7 +268,7 @@ io.on('connection', (socket) => {
         }
       });
 
-      registerListener('join poll', (data) => getPollData(data.id).then((pollData) => socket.join(data.id, () => sendFrame(SOCKET_ID, 'poll data', pollData))));
+      registerListener('join poll', (data) => getPollData(data.id, true).then((pollData) => socket.join(data.id, () => sendFrame(SOCKET_ID, 'poll data', pollData))));
       registerListener('leave poll', (data) => socket.leave(data.id));
 
       registerListener('unlock poll', (data, respond) => {

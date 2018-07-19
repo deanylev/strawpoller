@@ -7,7 +7,14 @@ export default Ember.Component.extend({
 
   topic: '',
   allowEditing: false,
+
   options: [],
+  selected: [],
+  displayedOptions: Ember.computed('options', 'selected', function() {
+    const options = [...this.get('options')];
+    options.forEach((option) => option.selected = this.get('selected').includes(option.id));
+    return options;
+  }),
 
   handleData: null,
   join: null,
@@ -28,6 +35,7 @@ export default Ember.Component.extend({
       this.set('allowEditing', data.allow_editing);
       this.set('options', data.options);
       if (!this.get('initialLoad')) {
+        this.set('selected', data.selected)
         this.set('initialLoad', true);
       }
     });
@@ -46,7 +54,7 @@ export default Ember.Component.extend({
     this.get('socket').unregisterListener('connect', this.join);
 
     // unsubscribe from the room
-    this.get('socket').leavePoll(this.get('poll_id'))
+    this.get('socket').leavePoll(this.get('poll_id'));
 
     this._super(...arguments);
   },
@@ -55,7 +63,9 @@ export default Ember.Component.extend({
     vote(option) {
       const type = option.selected ? 'remove': 'add';
       this.set('inFlight', true);
-      return this.get('socket').vote(type, this.get('poll_id'), option.id).finally(() => this.set('inFlight', false));
+      return this.get('socket').vote(type, this.get('poll_id'), option.id)
+        .then(() => this.set('selected', type === 'add' ? [option.id] : []))
+        .finally(() => this.set('inFlight', false));
     }
   }
 });
