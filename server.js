@@ -24,7 +24,7 @@ const io = require('socket.io')(http);
 const pool = mysql.createPool(DB_CREDS);
 
 // promise which resolves with the query results
-const query = (query, values) => {
+const query = (query, values, singleRow) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((err, connection) => {
       connection.query(query, values, (err, results) => {
@@ -32,7 +32,7 @@ const query = (query, values) => {
         if (err) {
           reject(err);
         } else {
-          resolve(results);
+          resolve(singleRow ? results[0] : results);
         }
       });
     });
@@ -198,8 +198,7 @@ io.on('connection', (socket) => {
       } else {
         return Promise.resolve();
       }
-    }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id])).then((polls) => {
-      const poll = polls[0];
+    }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id], true)).then((poll) => {
       const obj = {
         topic: poll ? poll.topic : 'Poll not found.',
         public: poll ? !!poll.public : false,
@@ -274,8 +273,7 @@ io.on('connection', (socket) => {
       registerListener('leave poll', (data) => socket.leave(data.id));
 
       registerListener('unlock poll', (data, respond) => {
-        query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id]).then((polls) => {
-          const poll = polls[0];
+        query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id], true).then((poll) => {
           if (poll) {
             if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === MASTER_PASS) {
               const admin = data.password === MASTER_PASS;
@@ -345,9 +343,9 @@ io.on('connection', (socket) => {
               if (UNLOCKED[data.id] && UNLOCKED[data.id].admin) {
                 let remainingQueries = QUERY_LIMIT;
                 const promises = [];
-                return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id])
-                  .then((votes) => {
-                    const voteCount = votes[0]['COUNT(*)'];
+                return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id], true)
+                  .then((result) => {
+                    const voteCount = result['COUNT(*)'];
                     // the new vote count is higher than the current count, votes need to be added to the db
                     if (option.votes > voteCount) {
                       for (let i = 0; i < Math.min(option.votes - voteCount, remainingQueries); i++) {
@@ -390,9 +388,9 @@ io.on('connection', (socket) => {
       registerListener('delete poll', (data, respond) => {
         if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID) {
           let isPublic = false;
-          query('SELECT public FROM polls WHERE id = ?', [data.id])
-            .then((polls) => {
-              isPublic = polls[0].public;
+          query('SELECT public FROM polls WHERE id = ?', [data.id], true)
+            .then((poll) => {
+              isPublic = poll.public;
               return query('DELETE FROM polls WHERE id = ?', [data.id])
             })
             .then(() => getPollData(data.id))
