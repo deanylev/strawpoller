@@ -126,8 +126,8 @@ http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 const UNLOCKED = {};
 
 io.on('connection', (socket) => {
-  // Cloudflare messes with the connecting IP
   let CLIENT_ID = null;
+  // Cloudflare messes with the connecting IP
   const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const SOCKET_ID = socket.id;
   const sendFrame = (target, name, data) => {
@@ -199,7 +199,7 @@ io.on('connection', (socket) => {
         return Promise.resolve();
       }
     }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id], true)).then((poll) => {
-      const obj = {
+      return {
         topic: poll ? poll.topic : 'Poll not found.',
         public: poll ? !!poll.public : false,
         allow_editing: poll ? !!poll.allow_editing : false,
@@ -208,12 +208,9 @@ io.on('connection', (socket) => {
         })) : [],
         selected: unique ? selected : null
       };
-
-      return obj;
     });
   };
 
-  // promise which resolves with a list of public polls
   const sendPublicPolls = (target) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC')
     .then((publicPolls) => sendFrame(target, 'public polls', publicPolls));
 
