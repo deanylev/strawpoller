@@ -39,17 +39,17 @@ export default Ember.Component.extend({
     ]);
   },
 
+  addOption() {
+    this.get('options').pushObject({
+      name: ''
+    });
+  },
+
+  removeOption(index) {
+    this.set('options', this.get('options').filter((option, i) => i !== index));
+  },
+
   actions: {
-    addOption() {
-      this.get('options').pushObject({
-        name: ''
-      });
-    },
-
-    removeOption(index) {
-      this.set('options', this.get('options').filter((option, i) => i !== index));
-    },
-
     createPoll() {
       return this.get('socket').createPoll({
         topic: this.get('topic'),
@@ -58,6 +58,22 @@ export default Ember.Component.extend({
         edit_password: this.get('editPassword'),
         options: this.get('options').filter((option) => option.name)
       }).then((data) => this.get('router').transitionTo('view', data.id));
+    },
+
+    optionFocusIn(index) {
+      if (index + 1 === this.get('options').length) {
+        this.addOption();
+      }
+    },
+
+    optionFocusOut(index) {
+      if (index > 0 ) {
+        if (index + 2 === this.get('options').length && !this.get('options')[index].name.trim()) {
+          this.removeOption(index + 1);
+        } else if (this.get('options').length >= 2 && !this.get('options')[index].name.trim()) {
+          this.removeOption(index);
+        }
+      }
     }
   }
 });

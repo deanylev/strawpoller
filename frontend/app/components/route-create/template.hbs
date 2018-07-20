@@ -24,16 +24,10 @@
     <br>
     {{#each options as |option index|}}
       <div class="form-group">
-        {{input class="form-control" type="text" value=option.name placeholder="Enter an option"}}
-        {{#if (gte index 2)}}
-          <br>
-          <button class="btn btn-danger" {{action "removeOption" index}}>Delete</button>
-        {{/if}}
+        {{input class="form-control" type="text" value=option.name placeholder="Enter an option" focusIn=(action "optionFocusIn" index) focusOut=(action "optionFocusOut" index)}}
       </div>
     {{/each}}
   {{/if}}
   <br>
-  <button class="btn btn-primary" {{action "addOption"}}>+ Add Option</button>
-  <br><br><br>
   {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "createPoll") disabled=disabled}}Create{{/spin-button}}
 </form>

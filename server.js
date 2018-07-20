@@ -233,8 +233,9 @@ io.on('connection', (socket) => {
 
       registerListener('create poll', (data, respond) => {
         const id = uuidv4();
+        const options = data.options.filter((option) => option.name.trim());
         // match client-side validation
-        if (data.topic && data.options.filter((option) => option.name.trim()).length >= 2 && (data.edit_password || !data.allow_editing)) {
+        if (data.topic && options.length >= 2 && (data.edit_password || !data.allow_editing)) {
           query('INSERT INTO polls SET ?', {
             id,
             created_at: Date.now(),
@@ -244,7 +245,7 @@ io.on('connection', (socket) => {
             public: data.public ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
             edit_password: passwordHash.generate(data.edit_password || uuidv4())
-          }).then(() => Promise.all(data.options.map((option) => query('INSERT INTO options SET ?', {
+          }).then(() => Promise.all(options.map((option) => query('INSERT INTO options SET ?', {
             id: uuidv4(),
             created_at: Date.now(),
             updated_at: Date.now(),
@@ -296,7 +297,8 @@ io.on('connection', (socket) => {
 
       registerListener('save poll', (data, respond) => {
         // match client-side validation
-        if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID && data.topic && data.options.filter((option) => option.name.trim()).length >= 2) {
+        const options = data.options.filter((option) => option.name.trim());
+        if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID && data.topic && options.length >= 2) {
           const dbData = {
             updated_at: Date.now(),
             topic: emojiStrip(data.topic),
@@ -312,8 +314,8 @@ io.on('connection', (socket) => {
           let currentOptions = null;
           let newOptions = null;
           query('SELECT id FROM options WHERE poll_id = ?', [data.id]).then((options) => {
-              currentOptions = data.options.filter((o1) => options.find((o2) => o2.id === o1.id));
-              newOptions = data.options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
+              currentOptions = options.filter((o1) => options.find((o2) => o2.id === o1.id));
+              newOptions = options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
               return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
             })
             // delete options from before that have been removed
