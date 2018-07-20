@@ -13,12 +13,7 @@ export default Ember.Service.extend({
 
   connectedDidChange: Ember.observer('connected', function() {
     if (this.get('connected')) {
-      this.getClientId().then((clientId) => {
-        if (!localStorage.getItem('clientId')) {
-          localStorage.setItem('clientId', clientId);
-        }
-        this.handshake(localStorage.getItem('clientId')).then(() => this.set('initialConnection', true));
-      });
+      this._getClientId().then((clientId) => this.handshake(clientId)).then(() => this.set('initialConnection', true));
     }
   }),
 
@@ -35,9 +30,17 @@ export default Ember.Service.extend({
     }));
   },
 
-  getClientId() {
+  _getClientId() {
     return new Ember.RSVP.Promise((resolve, reject) => {
-      new Fingerprint2().get(resolve);
+      const { clientId } = localStorage;
+      if (clientId && clientId.length === 32) {
+        resolve(clientId);
+      } else {
+        new Fingerprint2().get((newClientId) => {
+          localStorage.setItem('clientId', newClientId);
+          resolve(newClientId);
+        });
+      }
     });
   },
 
