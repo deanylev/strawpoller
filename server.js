@@ -69,6 +69,10 @@ createTable('options', [
     type: 'varchar(36)'
   },
   {
+    name: 'position',
+    type: 'int(11)'
+  },
+  {
     name: 'name',
     type: 'varchar(255)'
   }
@@ -168,7 +172,7 @@ io.on('connection', (socket) => {
     const options = [];
     const selected = [];
     let optionResults = null;
-    return query('SELECT id, name FROM options WHERE poll_id = ?', [id]).then((results) => {
+    return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]).then((results) => {
       const promises = results.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
       optionResults = results;
       return Promise.all(promises);
@@ -250,6 +254,7 @@ io.on('connection', (socket) => {
             created_at: Date.now(),
             updated_at: Date.now(),
             poll_id: id,
+            position: option.position,
             name: emojiStrip(option.name)
           })))).then(() => respond(true, {
             id
@@ -313,8 +318,8 @@ io.on('connection', (socket) => {
           }
           let currentOptions = null;
           let newOptions = null;
-          query('SELECT id FROM options WHERE poll_id = ?', [data.id]).then((options) => {
-              currentOptions = options.filter((o1) => options.find((o2) => o2.id === o1.id));
+          query('SELECT id FROM options WHERE poll_id = ?', [data.id]).then((results) => {
+              currentOptions = options.filter((o1) => results.find((o2) => o2.id === o1.id));
               newOptions = options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
               return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
             })
@@ -323,6 +328,7 @@ io.on('connection', (socket) => {
             // change names of options from before
             .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
               updated_at: Date.now(),
+              position: option.position,
               name: emojiStrip(option.name)
             }, option.id]))))
             // add new options
@@ -331,6 +337,7 @@ io.on('connection', (socket) => {
               created_at: Date.now(),
               updated_at: Date.now(),
               poll_id: data.id,
+              position: option.position,
               name: emojiStrip(option.name)
             }, option.id]))))
             .then(() => {

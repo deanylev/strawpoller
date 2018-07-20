@@ -56,7 +56,9 @@ export default Ember.Component.extend({
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
-        options: this.get('options').filter((option) => option.name)
+        options: this.get('options').filter((option) => option.name.trim()).map((option, index) => Object.assign({
+          position: index
+        }, option))
       }).then((data) => this.get('router').transitionTo('view', data.id));
     },
 

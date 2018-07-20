@@ -64,7 +64,12 @@ export default Ember.Component.extend({
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
-        options: this.get('options').filter((option) => option.name).concat(this.get('newOptions').filter((option) => option.name)),
+        options: this.get('options')
+          .concat(this.get('newOptions')
+          .filter((option) => option.name.trim()))
+          .map((option, index) => Object.assign({
+            position: index
+          }, option)),
         removed_options: this.get('removedOptions')
       }).then(() => this.get('router').transitionTo('view', this.get('poll_id')));
     },
