@@ -8,6 +8,11 @@
       <li class="nav-item">
         {{#link-to "public" class="nav-link"}}Public Polls{{/link-to}}
       </li>
+      {{#if socket.allPolls}}
+        <li class="nav-item">
+          {{#link-to "all" class="nav-link"}}All Polls{{/link-to}}
+        </li>
+      {{/if}}
     </ul>
   </div>
 </nav>

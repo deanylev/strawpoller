@@ -1,0 +1,12 @@
+{{#if socket.allPolls}}
+  <h1>All Polls</h1>
+  {{#each socket.allPolls as |poll|}}
+    <h5>{{#link-to "view" poll.id class="listed-poll"}}{{poll.topic}}{{/link-to}}</h5>
+    <p>({{if poll.public "Public" "Private"}})</p>
+  {{/each}}
+{{else}}
+  {{input class="form-control" type="password" value=password placeholder="Enter the master password"}}
+  <br>
+  <p class="text-danger">{{error}}</p>
+  {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not password) socket.disconnected)}}Submit{{/spin-button}}
+{{/if}}

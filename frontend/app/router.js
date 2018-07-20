@@ -11,6 +11,7 @@ Router.map(function() {
     path: '/'
   });
   this.route('public');
+  this.route('all');
   this.route('view', {
     path: '/view/:poll_id'
   });

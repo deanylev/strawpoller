@@ -157,10 +157,11 @@ io.on('connection', (socket) => {
 
       function respond(success, data) {
         ack(success, data);
-        logger[success ? 'log' : 'warn']('socket', `${success ? 'accepting' : 'rejecting'} frame`, Object.assign({
+        logger[success ? 'log' : 'warn']('socket', `${success ? 'accepting' : 'rejecting'} frame`, {
           socketId: SOCKET_ID,
-          name
-        }, data || {}));
+          name,
+          data
+        });
       }
 
       callback(data, respond);
@@ -440,6 +441,20 @@ io.on('connection', (socket) => {
         } else {
           respond(false, {
             reason: 'Invalid params.'
+          });
+        }
+      });
+
+      registerListener('get all polls', (data, respond) => {
+        if (data.password === MASTER_PASS) {
+          query('SELECT id, topic, public FROM polls ORDER BY updated_at ASC').then((polls) => {
+            respond(true, {
+              polls
+            });
+          });
+        } else {
+          respond(false, {
+            reason: 'Password incorrect.'
           });
         }
       });

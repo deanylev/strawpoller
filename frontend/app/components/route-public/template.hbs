@@ -1,7 +1,7 @@
 {{#if socket.publicPolls}}
   <h1>Public Polls</h1>
   {{#each socket.publicPolls as |poll|}}
-    <h5>{{#link-to "view" poll.id class="public-poll"}}{{poll.topic}}{{/link-to}}</h5>
+    <h5>{{#link-to "view" poll.id class="listed-poll"}}{{poll.topic}}{{/link-to}}</h5>
   {{/each}}
 {{else}}
   <h2>Loading...</h2>

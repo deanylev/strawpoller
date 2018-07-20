@@ -10,6 +10,7 @@ export default Ember.Service.extend({
   initialConnection: false,
 
   publicPolls: null,
+  allPolls: null,
 
   connectedDidChange: Ember.observer('connected', function() {
     if (this.get('connected')) {
@@ -117,5 +118,11 @@ export default Ember.Service.extend({
 
   getPublicPolls() {
     return this._sendFrame('get public polls');
+  },
+
+  getAllPolls(password) {
+    return this._sendFrame('get all polls', {
+      password
+    });
   }
 });
