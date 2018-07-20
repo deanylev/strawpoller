@@ -203,7 +203,7 @@ io.on('connection', (socket) => {
         options: poll ? options.map((option) => Object.assign(option, {
           max: option.votes + QUERY_LIMIT
         })) : [],
-        selected
+        selected: unique ? selected : null
       };
 
       return obj;
@@ -229,6 +229,7 @@ io.on('connection', (socket) => {
   registerListener('handshake', (data, respond) => {
     if (typeof data.clientId === 'string' && data.clientId.length === 32) {
       CLIENT_ID = data.clientId;
+      socket.join(CLIENT_ID);
       respond(true);
       sendPublicPolls(SOCKET_ID);
 
@@ -417,19 +418,23 @@ io.on('connection', (socket) => {
               option_id: optionId,
               client_id: CLIENT_ID,
               ip_address: CLIENT_IP
-            })).then(() => {
-              getPollData(pollId).then((pollData) => {
-                // announce
-                sendFrame(pollId, 'poll data', pollData);
-                respond(true);
-              });
+            })).then(() => Promise.all([
+              getPollData(pollId),
+              getPollData(pollId, true)
+            ])).then((values) => {
+              // announce
+              [pollId, CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
+              respond(true);
             });
         } else if (type === 'remove') {
-          query('DELETE FROM votes WHERE option_id = ? AND client_id = ? AND ip_address = ?', [optionId, CLIENT_ID, CLIENT_IP]).then(() => getPollData(pollId).then((pollData) => {
+          query('DELETE FROM votes WHERE option_id = ? AND client_id = ? AND ip_address = ?', [optionId, CLIENT_ID, CLIENT_IP]).then(() => Promise.all([
+            getPollData(pollId),
+            getPollData(pollId, true)
+          ])).then((values) => {
             // announce
-            sendFrame(pollId, 'poll data', pollData);
+            [pollId, CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
             respond(true);
-          }));
+          });
         } else {
           respond(false, {
             reason: 'Invalid params.'

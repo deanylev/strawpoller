@@ -34,8 +34,10 @@ export default Ember.Component.extend({
       this.set('topic', data.topic);
       this.set('allowEditing', data.allow_editing);
       this.set('options', data.options);
+      if (data.selected) {
+        this.set('selected', data.selected);
+      }
       if (!this.get('initialLoad')) {
-        this.set('selected', data.selected)
         this.set('initialLoad', true);
       }
     });
@@ -64,7 +66,6 @@ export default Ember.Component.extend({
       const type = option.selected ? 'remove': 'add';
       this.set('inFlight', true);
       return this.get('socket').vote(type, this.get('poll_id'), option.id)
-        .then(() => this.set('selected', type === 'add' ? [option.id] : []))
         .finally(() => this.set('inFlight', false));
     }
   }
