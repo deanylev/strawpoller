@@ -18,7 +18,7 @@ export default Ember.Component.extend({
   removedOptions: [],
   disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'newOptions.[]', 'newOptions.@each.name', 'socket.connected', function() {
     // topic can't be blank
-    return !(this.get('topic')
+    return !(this.get('topic').trim()
     // must have at least two options that aren't blank
     && this.get('options').concat(this.get('newOptions')).filter((option) => option.name.trim()).length >= 2
     // must be connected to the server

@@ -11,7 +11,7 @@ export default Ember.Component.extend({
   options: null,
   disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
-    return !(this.get('topic')
+    return !(this.get('topic').trim()
     // must have at least two options that aren't blank
     && this.get('options').filter((option) => option.name.trim()).length >= 2
     // password can't be blank if allowing editing

@@ -219,12 +219,10 @@ io.on('connection', (socket) => {
     ip: CLIENT_IP
   });
 
-  socket.on('disconnect', () => {
-    logger.log('socket', 'client disconnected', {
-      id: SOCKET_ID,
-      ip: CLIENT_IP
-    });
-  });
+  socket.on('disconnect', () => logger.log('socket', 'client disconnected', {
+    id: SOCKET_ID,
+    ip: CLIENT_IP
+  }));
 
   registerListener('handshake', (data, respond) => {
     if (typeof data.clientId === 'string' && data.clientId.length === 32) {
