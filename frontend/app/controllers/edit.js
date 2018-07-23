@@ -1,6 +1,6 @@
 import Ember from 'ember';
 
-export default Ember.Component.extend({
+export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
 
@@ -14,7 +14,7 @@ export default Ember.Component.extend({
   allowEditing: false,
   editPassword: '',
   options: null,
-  newOptions: null,
+  newOptions: [],
   removedOptions: [],
   disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'newOptions.[]', 'newOptions.@each.name', 'socket.connected', function() {
     // topic can't be blank
@@ -25,15 +25,9 @@ export default Ember.Component.extend({
     && this.get('socket.connected'));
   }),
 
-  init() {
-    this._super(...arguments);
-
-    this.set('newOptions', []);
-  },
-
   actions: {
     submitPassword() {
-      return this.get('socket').unlockPoll(this.get('poll_id'), this.get('password')).then((data) => {
+      return this.get('socket').unlockPoll(this.get('pollId'), this.get('password')).then((data) => {
         this.set('admin', data.admin);
         this.set('topic', data.topic);
         this.set('public', data.public);
@@ -59,7 +53,7 @@ export default Ember.Component.extend({
 
     savePoll() {
       return this.get('socket').savePoll({
-        id: this.get('poll_id'),
+        id: this.get('pollId'),
         topic: this.get('topic'),
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
@@ -71,12 +65,12 @@ export default Ember.Component.extend({
             position: index
           }, option)),
         removed_options: this.get('removedOptions')
-      }).then(() => this.get('router').transitionTo('view', this.get('poll_id')));
+      }).then(() => this.get('router').transitionTo('view', this.get('pollId')));
     },
 
     deletePoll() {
       if (confirm('Are you sure? This cannot be undone.')) {
-        this.get('socket').deletePoll(this.get('poll_id')).then(() => this.get('router').transitionTo('create'));
+        this.get('socket').deletePoll(this.get('pollId')).then(() => this.get('router').transitionTo('create'));
       } else {
         return Ember.RSVP.reject();
       }

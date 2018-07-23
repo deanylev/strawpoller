@@ -1,1 +1,33 @@
-{{route-create}}
+<form>
+  <h1>Create Poll</h1>
+  <br>
+  <div class="form-group">
+    {{input class="form-control" type="text" value=topic placeholder="Enter your topic"}}
+  </div>
+  <div class="form-check">
+    {{input id="public" class="form-check-input" type="checkbox" checked=public}}
+    <label class="form-check-label" for="public">Public?</label>
+  </div>
+  <br>
+  <div class="form-check">
+    {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
+    <label class="form-check-label" for="allow-editing">Allow editing?</label>
+  </div>
+  <br>
+  {{#liquid-if allowEditing}}
+    <div class="form-group">
+      {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password"}}
+    </div>
+  {{/liquid-if}}
+  {{#if options}}
+    <h2>Options</h2>
+    <br>
+    {{#each options as |option index|}}
+      <div class="form-group">
+        {{input class="form-control" type="text" value=option.name placeholder="Enter an option" focusIn=(action "optionFocusIn" index) focusOut=(action "optionFocusOut" index)}}
+      </div>
+    {{/each}}
+  {{/if}}
+  <br>
+  {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "createPoll") disabled=disabled}}Create{{/spin-button}}
+</form>

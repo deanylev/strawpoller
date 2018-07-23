@@ -3,13 +3,15 @@ import Ember from 'ember';
 export default Ember.Route.extend({
   model(params) {
     return {
-      poll_id: params.poll_id
+      pollId: params.poll_id
     };
   },
 
-  renderTemplate() {
-    this.render({
-      into: 'application'
-    });
+  setupController(controller, model) {
+    controller.subscribe(model.pollId);
   },
+
+  resetController(controller) {
+    controller.unsubscribe();
+  }
 });

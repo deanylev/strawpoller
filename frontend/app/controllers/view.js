@@ -1,9 +1,11 @@
 import Ember from 'ember';
 
-export default Ember.Component.extend({
+export default Ember.Controller.extend({
   socket: Ember.inject.service(),
 
   initialLoad: false,
+
+  pollId: null,
 
   topic: '',
   allowEditing: false,
@@ -21,28 +23,22 @@ export default Ember.Component.extend({
 
   inFlight: false,
 
-  init() {
-    this._super(...arguments);
-
+  subscribe(pollId) {
+    this.set('pollId', pollId);
     this.set('handleData', (data) => {
       this.setProperties({
         topic: data.topic,
         allowEditing: data.allow_editing,
         options: data.options,
-        waitingForResponse: false
+        waitingForResponse: false,
+        initialLoad: true
       });
-      this.set('topic', data.topic);
-      this.set('allowEditing', data.allow_editing);
-      this.set('options', data.options);
       if (data.selected) {
         this.set('selected', data.selected);
       }
-      if (!this.get('initialLoad')) {
-        this.set('initialLoad', true);
-      }
     });
 
-    this.set('join', () => this.get('socket').joinPoll(this.get('poll_id')));
+    this.set('join', () => this.get('socket').joinPoll(pollId).then(this.handleData));
 
     this.join();
 
@@ -50,22 +46,23 @@ export default Ember.Component.extend({
     this.get('socket').registerListener('connect', this.join);
   },
 
-  willDestroy() {
+  unsubscribe() {
+    this.set('initialLoad', false);
+    this.set('selected', []);
+
     // remove listeners
     this.get('socket').unregisterListener('poll data', this.handleData);
     this.get('socket').unregisterListener('connect', this.join);
 
     // unsubscribe from the room
-    this.get('socket').leavePoll(this.get('poll_id'));
-
-    this._super(...arguments);
+    this.get('socket').leavePoll(this.get('pollId'));
   },
 
   actions: {
     vote(option) {
       const type = option.selected ? 'remove': 'add';
       this.set('inFlight', true);
-      return this.get('socket').vote(type, this.get('poll_id'), option.id)
+      return this.get('socket').vote(type, this.get('pollId'), option.id)
         .finally(() => this.set('inFlight', false));
     }
   }

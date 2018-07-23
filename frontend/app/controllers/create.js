@@ -1,6 +1,6 @@
 import Ember from 'ember';
 
-export default Ember.Component.extend({
+export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
 
@@ -8,7 +8,14 @@ export default Ember.Component.extend({
   public: false,
   allowEditing: false,
   editPassword: '',
-  options: null,
+  options: [
+    {
+      name: ''
+    },
+    {
+      name: ''
+    }
+  ],
   disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic').trim()
@@ -25,19 +32,6 @@ export default Ember.Component.extend({
   allowEditingDidChange: Ember.observer('allowEditing', function() {
     this.set('editPassword', '');
   }),
-
-  init() {
-    this._super(...arguments);
-
-    this.set('options', [
-      {
-        name: ''
-      },
-      {
-        name: ''
-      }
-    ]);
-  },
 
   addOption() {
     this.get('options').pushObject({

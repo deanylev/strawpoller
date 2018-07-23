@@ -7,14 +7,14 @@ export default Ember.Service.extend({
   socket: null,
   connected: false,
   disconnected: Ember.computed.not('connected'),
-  initialConnection: false,
+  isHandshook: false,
 
   publicPolls: null,
   allPolls: null,
 
   connectedDidChange: Ember.observer('connected', function() {
     if (this.get('connected')) {
-      this._getClientId().then((clientId) => this.handshake(clientId)).then(() => this.set('initialConnection', true));
+      this._getClientId().then((clientId) => this.handshake(clientId)).then(() => this.set('isHandshook', true));
     }
   }),
 

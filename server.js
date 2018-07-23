@@ -267,7 +267,7 @@ io.on('connection', (socket) => {
         }
       });
 
-      registerListener('join poll', (data) => getPollData(data.id, true).then((pollData) => socket.join(data.id, () => sendFrame(SOCKET_ID, 'poll data', pollData))));
+      registerListener('join poll', (data, respond) => getPollData(data.id, true).then((pollData) => socket.join(data.id, () => respond(true, pollData))));
       registerListener('leave poll', (data) => socket.leave(data.id));
 
       registerListener('unlock poll', (data, respond) => {
