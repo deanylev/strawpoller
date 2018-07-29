@@ -151,7 +151,7 @@ io.on('connection', (socket) => {
   };
   const registerListener = (name, callback) => {
     socket.on(name, (data, ack) => {
-      let cleanData = {};
+      const cleanData = {};
       Object.keys(data || {}).forEach((key) => cleanData[key] = key === 'password' ? 'REDACTED' : data[key]);
       logger.log('socket', 'received frame', {
         socketId: SOCKET_ID,
@@ -159,16 +159,14 @@ io.on('connection', (socket) => {
         data: cleanData
       });
 
-      function respond(success, data) {
+      callback(data, (success, data) => {
         ack(success, data);
         logger[success ? 'log' : 'warn']('socket', `${success ? 'accepting' : 'rejecting'} frame`, {
           socketId: SOCKET_ID,
           name,
           data
         });
-      }
-
-      callback(data, respond);
+      });
     });
   };
 
@@ -353,7 +351,7 @@ io.on('connection', (socket) => {
             }, option.id]))))
             .then(() => {
               // only allow admins to insert fake votes
-              if (UNLOCKED[data.id] && UNLOCKED[data.id].admin) {
+              if (UNLOCKED[data.id].admin) {
                 let remainingQueries = QUERY_LIMIT;
                 const promises = [];
                 return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id], true)
