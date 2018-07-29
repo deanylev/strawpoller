@@ -88,7 +88,7 @@ createTable('polls', [
     type: 'mediumtext'
   },
   {
-    name: 'public',
+    name: 'one_vote_per_ip',
     type: 'tinyint(1)'
   },
   {
@@ -98,6 +98,10 @@ createTable('polls', [
   {
     name: 'edit_password',
     type: 'varchar(255)'
+  },
+  {
+    name: 'public',
+    type: 'tinyint(1)'
   }
 ]);
 
@@ -169,47 +173,55 @@ io.on('connection', (socket) => {
   };
 
   // promise which resolves with the topic, options and vote counts for a poll
-  const getPollData = (id, unique) => {
-    const options = [];
+  const getPollData = (id, unique, privateInfo) => {
+    const retOptions = [];
     const selected = [];
-    let optionResults = null;
-    return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]).then((results) => {
-      const promises = results.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
-      optionResults = results;
-      return Promise.all(promises);
-    }).then((values) => {
-      values.forEach((value, index) => {
-        const { id } = optionResults[index];
-        options.push({
-          id,
-          name: optionResults[index].name,
-          votes: value[0]['COUNT(*)']
+    let options = null;
+    let poll = null;
+    return query('SELECT topic, one_vote_per_ip, allow_editing, public FROM polls WHERE id = ?', [id], true)
+      .then((row) => {
+        poll = row;
+        return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
+      }).then((rows) => {
+        const promises = rows.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
+        options = rows;
+        return Promise.all(promises);
+      }).then((values) => {
+        values.forEach((value, index) => {
+          const { id } = options[index];
+          retOptions.push({
+            id,
+            name: options[index].name,
+            votes: value[0]['COUNT(*)']
+          });
         });
-      });
 
-      if (unique) {
-        return query('SELECT option_id FROM votes WHERE client_id = ? AND ip_address = ?', [CLIENT_ID, CLIENT_IP]).then((votes) => {
+        if (unique) {
+          return query(`SELECT option_id FROM votes WHERE ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [CLIENT_IP, CLIENT_ID]);
+        } else {
+          return Promise.resolve();
+        }
+      }).then((votes) => {
+        if (votes) {
           votes.forEach((vote) => {
-            const option = options.find((option) => option.id === vote.option_id);
+            const option = retOptions.find((option) => option.id === vote.option_id);
             if (option) {
               selected.push(option.id);
             }
           });
-        });
-      } else {
-        return Promise.resolve();
-      }
-    }).then(() => query('SELECT topic, public, allow_editing FROM polls WHERE id = ?', [id], true)).then((poll) => {
-      return {
-        topic: poll ? poll.topic : 'Poll not found.',
-        public: poll ? !!poll.public : false,
-        allow_editing: poll ? !!poll.allow_editing : false,
-        options: poll ? options.map((option) => Object.assign(option, {
-          max: option.votes + QUERY_LIMIT
-        })) : [],
-        selected: unique ? selected : null
-      };
-    });
+        }
+
+        return {
+          topic: poll ? poll.topic : 'Poll not found.',
+          one_vote_per_ip: privateInfo ? poll.one_vote_per_ip : null,
+          allow_editing: poll ? !!poll.allow_editing : false,
+          public: poll ? !!poll.public : false,
+          options: poll ? retOptions.map((option) => Object.assign(option, {
+            max: option.votes + QUERY_LIMIT
+          })) : [],
+          selected: unique ? selected : null
+        };
+      });
   };
 
   const sendPublicPolls = (target) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC')
@@ -229,6 +241,7 @@ io.on('connection', (socket) => {
     if (typeof data.clientId === 'string' && data.clientId.length === 32) {
       CLIENT_ID = data.clientId;
       socket.join(CLIENT_ID);
+      socket.join(CLIENT_IP);
       respond(true);
       sendPublicPolls(SOCKET_ID);
 
@@ -243,9 +256,10 @@ io.on('connection', (socket) => {
             updated_at: Date.now(),
             ip_address: CLIENT_IP,
             topic: emojiStrip(data.topic),
-            public: data.public ? 1 : 0,
+            one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
-            edit_password: passwordHash.generate(data.edit_password || uuidv4())
+            edit_password: passwordHash.generate(data.edit_password || uuidv4()),
+            public: data.public ? 1 : 0
           }).then(() => Promise.all(options.map((option) => query('INSERT INTO options SET ?', {
             id: uuidv4(),
             created_at: Date.now(),
@@ -280,7 +294,7 @@ io.on('connection', (socket) => {
                 admin
               };
               // return data to client requesting it
-              getPollData(data.id).then((pollData) => respond(true, Object.assign(pollData, {
+              getPollData(data.id, false, !!admin).then((pollData) => respond(true, Object.assign(pollData, {
                 admin
               })));
             } else {
@@ -305,8 +319,9 @@ io.on('connection', (socket) => {
             topic: emojiStrip(data.topic),
             public: data.public ? 1 : 0
           };
-          // only allow admins to change allow_editing prop
-          if (UNLOCKED[data.id] && UNLOCKED[data.id].admin) {
+          // only allow admins to change certain props
+          if (UNLOCKED[data.id].admin) {
+            dbData.one_vote_per_ip = data.one_vote_per_ip ? 1 : 0;
             dbData.allow_editing = data.allow_editing ? 1 : 0;
           }
           if (data.edit_password) {
@@ -409,40 +424,42 @@ io.on('connection', (socket) => {
 
       registerListener('vote', (data, respond) => {
         const { type, pollId, optionId } = data;
-        if (type === 'add') {
-          query('SELECT id FROM options WHERE poll_id = ?', [pollId])
-            // delete any existing votes from the same ip to prevent duplicates
-            .then((options) => Promise.all(options.map((option) => query('DELETE FROM votes WHERE option_id = ? AND client_id = ? AND ip_address = ?', [option.id, CLIENT_ID, CLIENT_IP]))))
-            // add the new vote
-            .then(() => query('INSERT INTO votes SET ?', {
-              id: uuidv4(),
-              created_at: Date.now(),
-              poll_id: pollId,
-              option_id: optionId,
-              client_id: CLIENT_ID,
-              ip_address: CLIENT_IP
-            })).then(() => Promise.all([
+        query('SELECT one_vote_per_ip FROM polls WHERE id = ?', [pollId], true).then((poll) =>  {
+          if (type === 'add') {
+            query('SELECT id FROM options WHERE poll_id = ?', [pollId])
+              // delete any existing votes from the same ip and/or client to prevent duplicates
+              .then((options) => Promise.all(options.map((option) => query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [option.id, CLIENT_IP, CLIENT_ID]))))
+              // add the new vote
+              .then(() => query('INSERT INTO votes SET ?', {
+                id: uuidv4(),
+                created_at: Date.now(),
+                poll_id: pollId,
+                option_id: optionId,
+                client_id: CLIENT_ID,
+                ip_address: CLIENT_IP
+              })).then(() => Promise.all([
+                getPollData(pollId),
+                getPollData(pollId, true)
+              ])).then((values) => {
+                // announce
+                [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
+                respond(true);
+              });
+          } else if (type === 'remove') {
+            query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [optionId, CLIENT_IP, CLIENT_ID]).then(() => Promise.all([
               getPollData(pollId),
               getPollData(pollId, true)
             ])).then((values) => {
               // announce
-              [pollId, CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
+              [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
               respond(true);
             });
-        } else if (type === 'remove') {
-          query('DELETE FROM votes WHERE option_id = ? AND client_id = ? AND ip_address = ?', [optionId, CLIENT_ID, CLIENT_IP]).then(() => Promise.all([
-            getPollData(pollId),
-            getPollData(pollId, true)
-          ])).then((values) => {
-            // announce
-            [pollId, CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
-            respond(true);
-          });
-        } else {
-          respond(false, {
-            reason: 'Invalid params.'
-          });
-        }
+          } else {
+            respond(false, {
+              reason: 'Invalid params.'
+            });
+          }
+        });
       });
 
       registerListener('get all polls', (data, respond) => {

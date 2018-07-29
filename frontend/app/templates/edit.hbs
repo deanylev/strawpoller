@@ -5,23 +5,30 @@
     <div class="form-group">
       {{textarea class="form-control" value=topic placeholder="Enter a topic"}}
     </div>
+    {{#if admin}}
+      <div class="form-check">
+        {{input id="vote-per-ip" class="form-check-input" type="checkbox" checked=oneVotePerIp}}
+        <label class="form-check-label" for="vote-per-ip" title="If enabled, one vote will be allowed per IP address. Otherwise, one vote per browser per IP address will be allowed.">Limit to one vote per IP address?</label>
+        <p class="text-danger">Warning: changing this on a poll that has already been voted on is likely to mess up what existing voters will see. Proceed with caution.</p>
+      </div>
+      <br>
+      <div class="form-check">
+        {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
+        <label class="form-check-label" for="allow-editing">Allow editing?</label>
+      </div>
+      <br>
+    {{/if}}
+    {{#liquid-if allowEditing}}
+      <div class="form-group">
+        {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password (leave blank to keep unchanged)"}}
+      </div>
+      <br>
+    {{/liquid-if}}
     <div class="form-check">
       {{input id="public" class="form-check-input" type="checkbox" checked=public}}
       <label class="form-check-label" for="public">Public?</label>
     </div>
     <br>
-    {{#if admin}}
-      <div class="form-check">
-        {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
-        <label class="form-check-label" for="allow-editing">Allow editing?</label>
-      </div>
-    {{/if}}
-    <br>
-    {{#liquid-if allowEditing}}
-      <div class="form-group">
-        {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password (leave blank to keep unchanged)"}}
-      </div>
-    {{/liquid-if}}
     {{#if (or options newOptions)}}
       <h2>Options</h2>
       {{#each options as |option index|}}
@@ -55,7 +62,7 @@
     <p class="text-danger">{{error}}</p>
     {{#spin-button class="btn btn-primary btn-block btn-lg" buttonStyle="zoom-out" action=(action "submitPassword") disabled=(or (not password) socket.disconnected)}}Submit{{/spin-button}}
     <br>
-    <h5>{{#link-to "view" poll_id class="text-dark"}}View Poll{{/link-to}}</h5>
+    <h5>{{#link-to "view" pollId class="text-dark"}}View Poll{{/link-to}}</h5>
     <br>
   {{/if}}
 </form>

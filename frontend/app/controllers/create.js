@@ -5,9 +5,10 @@ export default Ember.Controller.extend({
   socket: Ember.inject.service(),
 
   topic: '',
-  public: false,
+  oneVotePerIp: false,
   allowEditing: false,
   editPassword: '',
+  public: false,
   options: [
     {
       name: ''
@@ -27,7 +28,6 @@ export default Ember.Controller.extend({
     && this.get('socket.connected'));
   }),
 
-  publicPolls: [],
 
   allowEditingDidChange: Ember.observer('allowEditing', function() {
     this.set('editPassword', '');
@@ -47,13 +47,26 @@ export default Ember.Controller.extend({
     createPoll() {
       return this.get('socket').createPoll({
         topic: this.get('topic'),
-        public: this.get('public'),
+        one_vote_per_ip: this.get('oneVotePerIp'),
         allow_editing: this.get('allowEditing'),
+        public: this.get('public'),
         edit_password: this.get('editPassword'),
         options: this.get('options').filter((option) => option.name.trim()).map((option, index) => Object.assign({
           position: index
         }, option))
-      }).then((data) => this.get('router').transitionTo('view', data.id));
+      }).then((data) => this.get('router').transitionTo('view', data.id)).then(() => this.setProperties({
+        topic: '',
+        oneVotePerIp: false,
+        allowEditing: false,
+        public: false,
+        options: [{
+            name: ''
+          },
+          {
+            name: ''
+          }
+        ],
+      }));
     },
 
     optionFocusIn(index) {

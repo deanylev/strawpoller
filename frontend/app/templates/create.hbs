@@ -5,20 +5,26 @@
     {{input class="form-control" type="text" value=topic placeholder="Enter your topic"}}
   </div>
   <div class="form-check">
-    {{input id="public" class="form-check-input" type="checkbox" checked=public}}
-    <label class="form-check-label" for="public">Public?</label>
+    {{input id="vote-per-ip" class="form-check-input" type="checkbox" checked=oneVotePerIp}}
+    <label class="form-check-label" for="vote-per-ip" title="If enabled, one vote will be allowed per IP address. Otherwise, one vote per browser per IP address will be allowed.">Limit to one vote per IP address?</label>
   </div>
   <br>
   <div class="form-check">
     {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
     <label class="form-check-label" for="allow-editing">Allow editing?</label>
   </div>
-  <br>
   {{#liquid-if allowEditing}}
+    <br>
     <div class="form-group">
       {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password"}}
     </div>
   {{/liquid-if}}
+  <br>
+  <div class="form-check">
+    {{input id="public" class="form-check-input" type="checkbox" checked=public}}
+    <label class="form-check-label" for="public">Public?</label>
+  </div>
+  <br>
   {{#if options}}
     <h2>Options</h2>
     <br>

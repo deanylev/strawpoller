@@ -11,8 +11,10 @@ export default Ember.Controller.extend({
   admin: false,
 
   topic: '',
+  oneVotePerIp: false,
   allowEditing: false,
   editPassword: '',
+  public: false,
   options: null,
   newOptions: [],
   removedOptions: [],
@@ -30,8 +32,9 @@ export default Ember.Controller.extend({
       return this.get('socket').unlockPoll(this.get('pollId'), this.get('password')).then((data) => {
         this.set('admin', data.admin);
         this.set('topic', data.topic);
-        this.set('public', data.public);
+        this.set('oneVotePerIp', data.one_vote_per_ip);
         this.set('allowEditing', data.allow_editing);
+        this.set('public', data.public);
         this.set('options', data.options);
         this.set('unlocked', true);
       }).catch((err) => this.set('error', err.reason));
@@ -55,9 +58,10 @@ export default Ember.Controller.extend({
       return this.get('socket').savePoll({
         id: this.get('pollId'),
         topic: this.get('topic'),
-        public: this.get('public'),
+        one_vote_per_ip: this.get('oneVotePerIp'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
+        public: this.get('public'),
         options: this.get('options')
           .concat(this.get('newOptions')
           .filter((option) => option.name.trim()))
