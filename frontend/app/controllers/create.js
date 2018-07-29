@@ -4,19 +4,6 @@ export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
 
-  topic: '',
-  oneVotePerIp: false,
-  allowEditing: false,
-  editPassword: '',
-  public: false,
-  options: [
-    {
-      name: ''
-    },
-    {
-      name: ''
-    }
-  ],
   disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic').trim()
@@ -28,15 +15,35 @@ export default Ember.Controller.extend({
     && this.get('socket.connected'));
   }),
 
-
   allowEditingDidChange: Ember.observer('allowEditing', function() {
     this.set('editPassword', '');
   }),
 
-  addOption() {
-    this.get('options').pushObject({
-      name: ''
+  init() {
+    this._super(...arguments);
+
+    this.setDefaults();
+  },
+
+  setDefaults() {
+    this.setProperties({
+      topic: '',
+      oneVotePerIp: false,
+      allowEditing: false,
+      editPassword: '',
+      public: false,
+      options: []
     });
+
+    this.addOptions(2);
+  },
+
+  addOptions(amount) {
+    for (let i = 0; i < amount; i++) {
+      this.get('options').pushObject({
+        name: ''
+      });
+    }
   },
 
   removeOption(index) {
@@ -54,24 +61,12 @@ export default Ember.Controller.extend({
         options: this.get('options').filter((option) => option.name.trim()).map((option, index) => Object.assign({
           position: index
         }, option))
-      }).then((data) => this.get('router').transitionTo('view', data.id)).then(() => this.setProperties({
-        topic: '',
-        oneVotePerIp: false,
-        allowEditing: false,
-        public: false,
-        options: [{
-            name: ''
-          },
-          {
-            name: ''
-          }
-        ],
-      }));
+      }).then((data) => this.get('router').transitionTo('view', data.id)).then(() => this.setDefaults());
     },
 
     optionFocusIn(index) {
       if (index + 1 === this.get('options').length) {
-        this.addOption();
+        this.addOptions(1);
       }
     },
 

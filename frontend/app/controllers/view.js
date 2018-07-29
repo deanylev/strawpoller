@@ -3,15 +3,12 @@ import Ember from 'ember';
 export default Ember.Controller.extend({
   socket: Ember.inject.service(),
 
-  initialLoad: false,
-
   pollId: null,
 
   topic: '',
   allowEditing: false,
 
   options: [],
-  selected: [],
   displayedOptions: Ember.computed('options', 'selected', function() {
     const options = [...this.get('options')];
     options.forEach((option) => option.selected = this.get('selected').includes(option.id));
@@ -22,6 +19,19 @@ export default Ember.Controller.extend({
   join: null,
 
   inFlight: false,
+
+  init() {
+    this._super(...arguments);
+
+    this.setDefaults();
+  },
+
+  setDefaults() {
+    this.setProperties({
+      initialLoad: false,
+      selected: []
+    });
+  },
 
   subscribe(pollId) {
     this.set('pollId', pollId);
@@ -47,8 +57,7 @@ export default Ember.Controller.extend({
   },
 
   unsubscribe() {
-    this.set('initialLoad', false);
-    this.set('selected', []);
+    this.setDefaults();
 
     // remove listeners
     this.get('socket').unregisterListener('poll data', this.handleData);

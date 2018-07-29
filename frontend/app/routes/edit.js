@@ -12,10 +12,6 @@ export default Ember.Route.extend({
   },
 
   resetController(controller) {
-    controller.setProperties({
-      unlocked: false,
-      password: '',
-      error: ''
-    });
+    controller.setDefaults();
   }
 });

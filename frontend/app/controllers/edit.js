@@ -4,10 +4,6 @@ export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
 
-  unlocked: false,
-  password: '',
-  error: '',
-
   admin: false,
 
   topic: '',
@@ -27,16 +23,32 @@ export default Ember.Controller.extend({
     && this.get('socket.connected'));
   }),
 
+  init() {
+    this._super(...arguments);
+
+    this.setDefaults();
+  },
+
+  setDefaults() {
+    this.setProperties({
+      unlocked: false,
+      password: '',
+      error: ''
+    });
+  },
+
   actions: {
     submitPassword() {
       return this.get('socket').unlockPoll(this.get('pollId'), this.get('password')).then((data) => {
-        this.set('admin', data.admin);
-        this.set('topic', data.topic);
-        this.set('oneVotePerIp', data.one_vote_per_ip);
-        this.set('allowEditing', data.allow_editing);
-        this.set('public', data.public);
-        this.set('options', data.options);
-        this.set('unlocked', true);
+        this.setProperties({
+          admin: data.admin,
+          topic: data.topic,
+          oneVotePerIp: data.one_vote_per_ip,
+          allowEditing: data.allow_editing,
+          public: data.public,
+          options: data.options,
+          unlocked: true
+        });
       }).catch((err) => this.set('error', err.reason));
     },
 
