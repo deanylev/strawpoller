@@ -13,7 +13,8 @@ const {
   PORT,
   QUERY_LIMIT,
   MASTER_PASS,
-  DB_CREDS
+  DB_CREDS,
+  HANDSHAKE_WAIT_TIME
 } = require('./globals');
 
 // config
@@ -190,6 +191,14 @@ io.on('connection', (socket) => {
       }
     });
   };
+  const kickClient = (reason) => {
+    logger.warn('socket', 'kicking client', {
+      socketId: SOCKET_ID,
+      reason
+    });
+
+    socket.disconnect();
+  };
 
   // promise which resolves with the topic, options and vote counts for a poll
   const getPollData = (id, unique, privateInfo) => {
@@ -255,6 +264,13 @@ io.on('connection', (socket) => {
     id: SOCKET_ID,
     ip: CLIENT_IP
   }));
+
+  // kick client if no handshake within specified period
+  setTimeout(() => {
+    if (CLIENT_ID === null) {
+      kickClient('handshake timeout');
+    }
+  }, HANDSHAKE_WAIT_TIME);
 
   registerListener('handshake', (data, respond) => {
     if (typeof data.clientId === 'string' && data.clientId.length === 32) {
@@ -498,7 +514,7 @@ io.on('connection', (socket) => {
       respond(false, {
         reason: 'Invalid client ID.'
       });
-      socket.disconnect();
+      kickClient('handshake rejected');
     }
   });
 });

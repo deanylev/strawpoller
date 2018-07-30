@@ -26,3 +26,5 @@ module.exports.LOGGER = Object.freeze({
     'error'
   ]
 });
+
+module.exports.HANDSHAKE_WAIT_TIME = 10000;
