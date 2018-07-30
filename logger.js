@@ -9,8 +9,8 @@ const {
 function Logger() {}
 
 LOGGER.levels.forEach((level) => {
-  Logger.prototype[level] = function(context, message, data) {
-    console[level](`${chalk.bold[LOGGER.colours[level]](`${level.toUpperCase()}:`)} [${context}] ${message}`, JSON.stringify(data));
+  Logger.prototype[level] = function(context, message, data ) {
+    console[level](`${chalk.bold[LOGGER.colours[level]](`${level.toUpperCase()}:`)} [${context}] ${message}`, data ? JSON.stringify(data) : '');
   };
 });
 
