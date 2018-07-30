@@ -150,8 +150,8 @@ io.on('connection', (socket) => {
       io.to(target).emit(name, data);
     }
   };
-  const registerListener = (name, callback) => {
-    socket.on(name, (data = {}, ack) => {
+  const registerListener = (name, callback, once) => {
+    socket[once ? 'once' : 'on'](name, (data = {}, ack) => {
       if (typeof data !== 'object' || data === null || typeof ack !== 'function') {
         logger.warn('socket', 'dropping invalid frame', {
           socketId: SOCKET_ID,
@@ -525,7 +525,7 @@ io.on('connection', (socket) => {
       });
       kickClient('handshake rejected');
     }
-  });
+  }, true);
 });
 
 app.get('/', (req, res) => res.render('pages/index'));
