@@ -150,23 +150,44 @@ io.on('connection', (socket) => {
     }
   };
   const registerListener = (name, callback) => {
-    socket.on(name, (data, ack) => {
+    socket.on(name, (data = {}, ack) => {
+      if (typeof data !== 'object' || data === null || typeof ack !== 'function') {
+        logger.warn('socket', 'dropping invalid frame', {
+          socketId: SOCKET_ID,
+          name,
+          data,
+          ack
+        });
+        return;
+      }
+
       const cleanData = {};
-      Object.keys(data || {}).forEach((key) => cleanData[key] = key === 'password' ? 'REDACTED' : data[key]);
+      Object.keys(data).forEach((key) => cleanData[key] = key === 'password' ? 'REDACTED' : data[key]);
       logger.log('socket', 'received frame', {
         socketId: SOCKET_ID,
         name,
         data: cleanData
       });
 
-      callback(data, (success, data) => {
-        ack(success, data);
-        logger[success ? 'log' : 'warn']('socket', `${success ? 'accepting' : 'rejecting'} frame`, {
+      try {
+        callback(data, (success, data) => {
+          ack(success, data);
+          logger[success ? 'log' : 'warn']('socket', `${success ? 'accepting' : 'rejecting'} frame`, {
+            socketId: SOCKET_ID,
+            name,
+            data
+          });
+        });
+      } catch (error) {
+        logger.error('socket', 'uncaught error inside listener callback', {
           socketId: SOCKET_ID,
           name,
-          data
+          data,
+          error: error.stack
         });
-      });
+
+        ack(false);
+      }
     });
   };
 
