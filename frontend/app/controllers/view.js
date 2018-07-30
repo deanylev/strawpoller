@@ -40,15 +40,17 @@ export default Ember.Controller.extend({
         topic: data.topic,
         allowEditing: data.allow_editing,
         options: data.options,
-        waitingForResponse: false,
-        initialLoad: true
+        waitingForResponse: false
       });
       if (data.selected) {
         this.set('selected', data.selected);
       }
     });
 
-    this.set('join', () => this.get('socket').joinPoll(pollId).then(this.handleData));
+    this.set('join', () => this.get('socket').joinPoll(pollId)
+      .then(this.handleData)
+      .catch(() => this.set('topic', 'Poll not found.'))
+      .finally(() => this.set('initialLoad', true)));
 
     this.join();
 

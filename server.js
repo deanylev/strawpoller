@@ -208,8 +208,12 @@ io.on('connection', (socket) => {
     let poll = null;
     return query('SELECT topic, one_vote_per_ip, allow_editing, public FROM polls WHERE id = ?', [id], true)
       .then((row) => {
-        poll = row;
-        return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
+        if (row) {
+          poll = row;
+          return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
+        } else {
+          return Promise.reject();
+        }
       }).then((rows) => {
         const promises = rows.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
         options = rows;
@@ -240,13 +244,13 @@ io.on('connection', (socket) => {
         }
 
         return {
-          topic: poll ? poll.topic : 'Poll not found.',
+          topic: poll.topic,
           one_vote_per_ip: privateInfo ? poll.one_vote_per_ip : null,
-          allow_editing: poll ? !!poll.allow_editing : false,
-          public: poll ? !!poll.public : false,
-          options: poll ? retOptions.map((option) => Object.assign(option, {
+          allow_editing: !!poll.allow_editing,
+          public: !!poll.public,
+          options: retOptions.map((option) => Object.assign(option, {
             max: option.votes + QUERY_LIMIT
-          })) : [],
+          })),
           selected: unique ? selected : null
         };
       });
@@ -316,7 +320,12 @@ io.on('connection', (socket) => {
         }
       });
 
-      registerListener('join poll', (data, respond) => getPollData(data.id, true).then((pollData) => socket.join(data.id, () => respond(true, pollData))));
+      registerListener('join poll', (data, respond) => {
+        getPollData(data.id, true)
+          .then((pollData) => socket.join(data.id, () => respond(true, pollData)))
+          .catch(() => respond(false));
+      });
+
       registerListener('leave poll', (data) => socket.leave(data.id));
 
       registerListener('unlock poll', (data, respond) => {
