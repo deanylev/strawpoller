@@ -10,7 +10,7 @@ function Logger() {}
 
 LOGGER.levels.forEach((level) => {
   Logger.prototype[level] = function(context, message, data ) {
-    console[level](`${chalk.bold[LOGGER.colours[level]](`${level.toUpperCase()}:`)} [${context}] ${message}`, data ? JSON.stringify(data) : '');
+    console[level](`${new Date().toLocaleTimeString()} ${chalk.bold[LOGGER.colours[level]](`${level.toUpperCase()}:`)} [${context}] ${message}`, data ? JSON.stringify(data) : '');
   };
 });
 
