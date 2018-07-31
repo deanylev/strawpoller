@@ -6,6 +6,7 @@ export default Ember.Controller.extend({
   pollId: null,
 
   topic: '',
+  locked: false,
   allowEditing: false,
 
   options: [],
@@ -38,6 +39,7 @@ export default Ember.Controller.extend({
     this.set('handleData', (data) => {
       this.setProperties({
         topic: data.topic,
+        locked: data.locked,
         allowEditing: data.allow_editing,
         options: data.options,
         waitingForResponse: false
@@ -47,15 +49,17 @@ export default Ember.Controller.extend({
       }
     });
 
-    this.set('join', () => this.get('socket').joinPoll(pollId)
-      .then(this.handleData)
-      .catch(() => this.set('topic', 'Poll not found.'))
-      .finally(() => this.set('initialLoad', true)));
+    this.set('join', () => {
+      this.get('socket').joinPoll(pollId)
+        .then(this.handleData)
+        .catch(() => this.set('topic', 'Poll not found.'))
+        .finally(() => this.set('initialLoad', true))
+    });
 
     this.join();
 
     this.get('socket').registerListener('poll data', this.handleData);
-    this.get('socket').registerListener('connect', this.join);
+    this.get('socket').registerListener('handshake', this.join);
   },
 
   unsubscribe() {
@@ -63,7 +67,7 @@ export default Ember.Controller.extend({
 
     // remove listeners
     this.get('socket').unregisterListener('poll data', this.handleData);
-    this.get('socket').unregisterListener('connect', this.join);
+    this.get('socket').unregisterListener('handshake', this.join);
 
     // unsubscribe from the room
     this.get('socket').leavePoll(this.get('pollId'));

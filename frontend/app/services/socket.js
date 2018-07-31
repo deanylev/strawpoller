@@ -95,8 +95,8 @@ export default Ember.Service.extend({
     });
   },
 
-  unlockPoll(id, password) {
-    return this._sendFrame('unlock poll', {
+  authenticatePoll(id, password) {
+    return this._sendFrame('authenticate poll', {
       id,
       password
     });
@@ -108,6 +108,13 @@ export default Ember.Service.extend({
 
   savePoll(data) {
     return this._sendFrame('save poll', data);
+  },
+
+  setPollLocked(id, locked) {
+    return this._sendFrame('set poll locked', {
+      id,
+      locked
+    });
   },
 
   deletePoll(id) {

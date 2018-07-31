@@ -7,6 +7,7 @@ export default Ember.Controller.extend({
   admin: false,
 
   topic: '',
+  locked: false,
   oneVotePerIp: false,
   allowEditing: false,
   editPassword: '',
@@ -31,7 +32,7 @@ export default Ember.Controller.extend({
 
   setDefaults() {
     this.setProperties({
-      unlocked: false,
+      authenticated: false,
       password: '',
       error: ''
     });
@@ -39,15 +40,16 @@ export default Ember.Controller.extend({
 
   actions: {
     submitPassword() {
-      return this.get('socket').unlockPoll(this.get('pollId'), this.get('password')).then((data) => {
+      return this.get('socket').authenticatePoll(this.get('pollId'), this.get('password')).then((data) => {
         this.setProperties({
           admin: data.admin,
           topic: data.topic,
+          locked: data.locked,
           oneVotePerIp: data.one_vote_per_ip,
           allowEditing: data.allow_editing,
           public: data.public,
           options: data.options,
-          unlocked: true
+          authenticated: true
         });
       }).catch((err) => this.set('error', err.reason));
     },
@@ -82,6 +84,11 @@ export default Ember.Controller.extend({
           }, option)),
         removed_options: this.get('removedOptions')
       }).then(() => this.get('router').transitionTo('view', this.get('pollId')));
+    },
+
+    changeLocked() {
+      return this.get('socket').setPollLocked(this.get('pollId'), !this.get('locked'))
+        .then(() => this.toggleProperty('locked'));
     },
 
     deletePoll() {

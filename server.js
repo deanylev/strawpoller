@@ -90,6 +90,10 @@ createTable('polls', [
     type: 'mediumtext'
   },
   {
+    name: 'locked',
+    type: 'tinyint(1)'
+  },
+  {
     name: 'one_vote_per_ip',
     type: 'tinyint(1)'
   },
@@ -128,8 +132,8 @@ createTable('votes', [
 
 http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 
-// keeps track of what polls are unlocked for editing to which users
-const UNLOCKED = {};
+// keeps track of what polls are authenticated for editing to which users
+const AUTHENTICATED = {};
 
 io.on('connection', (socket) => {
   let CLIENT_ID = null;
@@ -207,7 +211,7 @@ io.on('connection', (socket) => {
     const selected = [];
     let options = null;
     let poll = null;
-    return query('SELECT topic, one_vote_per_ip, allow_editing, public FROM polls WHERE id = ?', [id], true)
+    return query('SELECT topic, locked, one_vote_per_ip, allow_editing, public FROM polls WHERE id = ?', [id], true)
       .then((row) => {
         if (row) {
           poll = row;
@@ -246,7 +250,8 @@ io.on('connection', (socket) => {
 
         return {
           topic: poll.topic,
-          one_vote_per_ip: privateInfo ? poll.one_vote_per_ip : null,
+          locked: !!poll.locked,
+          one_vote_per_ip: privateInfo ? !!poll.one_vote_per_ip : null,
           allow_editing: !!poll.allow_editing,
           public: !!poll.public,
           options: retOptions.map((option) => Object.assign(option, {
@@ -282,6 +287,7 @@ io.on('connection', (socket) => {
       CLIENT_ID = data.clientId;
       socket.join(CLIENT_ID);
       socket.join(CLIENT_IP);
+      sendFrame(SOCKET_ID, 'handshake');
       respond(true);
       sendPublicPolls(SOCKET_ID);
 
@@ -296,6 +302,7 @@ io.on('connection', (socket) => {
             updated_at: Date.now(),
             ip_address: CLIENT_IP,
             topic: emojiStrip(data.topic),
+            locked: 0,
             one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
             edit_password: passwordHash.generate(data.edit_password || uuidv4()),
@@ -329,12 +336,12 @@ io.on('connection', (socket) => {
 
       registerListener('leave poll', (data) => socket.leave(data.id));
 
-      registerListener('unlock poll', (data, respond) => {
+      registerListener('authenticate poll', (data, respond) => {
         query('SELECT allow_editing, edit_password FROM polls WHERE id = ?', [data.id], true).then((poll) => {
           if (poll) {
             if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === MASTER_PASS) {
               const admin = data.password === MASTER_PASS;
-              UNLOCKED[SOCKET_ID] = {
+              AUTHENTICATED[SOCKET_ID] = {
                 id: data.id,
                 admin
               };
@@ -358,14 +365,14 @@ io.on('connection', (socket) => {
       registerListener('save poll', (data, respond) => {
         // match client-side validation
         const options = data.options.filter((option) => option.name.trim());
-        if (UNLOCKED[SOCKET_ID] && UNLOCKED[SOCKET_ID].id === data.id && data.topic && options.length >= 2) {
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && data.topic && options.length >= 2) {
           const dbData = {
             updated_at: Date.now(),
             topic: emojiStrip(data.topic),
             public: data.public ? 1 : 0
           };
           // only allow admins to change certain props
-          if (UNLOCKED[SOCKET_ID].admin) {
+          if (AUTHENTICATED[SOCKET_ID].admin) {
             dbData.one_vote_per_ip = data.one_vote_per_ip ? 1 : 0;
             dbData.allow_editing = data.allow_editing ? 1 : 0;
           }
@@ -398,7 +405,7 @@ io.on('connection', (socket) => {
             }, option.id]))))
             .then(() => {
               // only allow admins to insert fake votes
-              if (UNLOCKED[SOCKET_ID].admin) {
+              if (AUTHENTICATED[SOCKET_ID].admin) {
                 let remainingQueries = QUERY_LIMIT;
                 const promises = [];
                 return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE poll_id = ? AND option_id = ?', [data.id, option.id], true)
@@ -440,8 +447,23 @@ io.on('connection', (socket) => {
         }
       });
 
+      registerListener('set poll locked', (data, respond) => {
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
+          query('UPDATE polls SET ? WHERE id = ?', [{
+            locked: data.locked
+          }, data.id]).then(() => getPollData(data.id).then((pollData) => {
+            sendFrame(data.id, 'poll data', pollData);
+            respond(true);
+          }));
+        } else {
+          respond(false, {
+            reason: REJECTION_REASONS.auth
+          });
+        }
+      });
+
       registerListener('delete poll', (data, respond) => {
-        if (UNLOCKED[SOCKET_ID] && UNLOCKED[SOCKET_ID].id === data.id) {
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
           let isPublic = false;
           query('SELECT public FROM polls WHERE id = ?', [data.id], true)
             .then((poll) => {
@@ -466,7 +488,14 @@ io.on('connection', (socket) => {
 
       registerListener('vote', (data, respond) => {
         const { type, pollId, optionId } = data;
-        query('SELECT one_vote_per_ip FROM polls WHERE id = ?', [pollId], true).then((poll) =>  {
+        query('SELECT locked, one_vote_per_ip FROM polls WHERE id = ?', [pollId], true).then((poll) =>  {
+          if (poll.locked) {
+            respond(false, {
+              reason: REJECTION_REASONS.auth
+            });
+            return;
+          }
+
           if (type === 'add') {
             query('SELECT id FROM options WHERE poll_id = ?', [pollId])
               // delete any existing votes from the same ip and/or client to prevent duplicates

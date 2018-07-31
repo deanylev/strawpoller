@@ -1,7 +1,7 @@
 <h1>Edit Poll</h1>
 <br>
 <form>
-  {{#if unlocked}}
+  {{#if authenticated}}
     <div class="form-group">
       {{textarea class="form-control" value=topic placeholder="Enter a topic"}}
     </div>
@@ -54,6 +54,7 @@
     <button class="btn btn-primary" {{action "addOption"}}>+ Add Option</button>
     <br><br>
     {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "savePoll") disabled=disabled}}Save{{/spin-button}}
+    {{#spin-button class="btn btn-warning btn-block btn-lg" buttonStyle="zoom-out" action=(action "changeLocked") disabled=disabled}}{{if locked "Unlock" "Lock"}} Poll Voting{{/spin-button}}
     {{#spin-button class="btn btn-danger btn-block btn-lg" buttonStyle="zoom-out" action=(action "deletePoll") disabled=socket.disconnected}}Delete Poll{{/spin-button}}
     <br><br>
   {{else}}
