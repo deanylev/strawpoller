@@ -491,13 +491,15 @@ io.on('connection', (socket) => {
                 respond(true);
               });
           } else if (type === 'remove') {
-            query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [optionId, CLIENT_IP, CLIENT_ID]).then(() => Promise.all([
-              getPollData(pollId),
-              getPollData(pollId, true)
-            ])).then((values) => {
-              // announce
-              [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
-              respond(true);
+            query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [optionId, CLIENT_IP, CLIENT_ID])
+              .then(() => getPollData(pollId, true)).then((fullData) => {
+                const generalData = {};
+                Object.assign(generalData, fullData);
+                delete generalData.selected;
+                const data = [fullData, generalData];
+                // announce
+                [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', data[index]));
+                respond(true);
             });
           } else {
             respond(false, {
