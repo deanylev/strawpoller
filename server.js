@@ -339,7 +339,7 @@ io.on('connection', (socket) => {
                 admin
               };
               // return data to client requesting it
-              getPollData(data.id, false, !!admin).then((pollData) => respond(true, Object.assign(pollData, {
+              getPollData(data.id, false, admin).then((pollData) => respond(true, Object.assign(pollData, {
                 admin
               })));
             } else {
