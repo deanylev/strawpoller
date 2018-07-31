@@ -27,4 +27,12 @@ module.exports.LOGGER = Object.freeze({
   ]
 });
 
+module.exports.REJECTION_REASONS = {
+  params: 'Invalid params.',
+  password: 'Password incorrect.',
+  existence: 'Poll not found.',
+  auth: 'Unauthorised.',
+  password: 'Password incorrect.'
+};
+
 module.exports.HANDSHAKE_WAIT_TIME = 10000;

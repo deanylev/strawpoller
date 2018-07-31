@@ -14,7 +14,8 @@ const {
   QUERY_LIMIT,
   MASTER_PASS,
   DB_CREDS,
-  HANDSHAKE_WAIT_TIME
+  HANDSHAKE_WAIT_TIME,
+  REJECTION_REASONS
 } = require('./globals');
 
 // config
@@ -315,7 +316,7 @@ io.on('connection', (socket) => {
           });
         } else {
           respond(false, {
-            reason: 'Invalid params.'
+            reason: REJECTION_REASONS.params
           });
         }
       });
@@ -343,12 +344,12 @@ io.on('connection', (socket) => {
               })));
             } else {
               respond(false, {
-                reason: 'Password incorrect.'
+                reason: REJECTION_REASONS.password
               });
             }
           } else {
             respond(false, {
-              reason: 'Poll not found.'
+              reason: REJECTION_REASONS.existence
             });
           }
         });
@@ -437,7 +438,7 @@ io.on('connection', (socket) => {
             });
         } else {
           respond(false, {
-            reason: 'Invalid params.'
+            reason: REJECTION_REASONS.params
           });
         }
       });
@@ -461,7 +462,7 @@ io.on('connection', (socket) => {
             });
         } else {
           respond(false, {
-            reason: 'Unauthorised.'
+            reason: REJECTION_REASONS.auth
           });
         }
       });
@@ -500,7 +501,7 @@ io.on('connection', (socket) => {
             });
           } else {
             respond(false, {
-              reason: 'Invalid params.'
+              reason: REJECTION_REASONS.params
             });
           }
         });
@@ -515,13 +516,13 @@ io.on('connection', (socket) => {
           });
         } else {
           respond(false, {
-            reason: 'Password incorrect.'
+            reason: REJECTION_REASONS.password
           });
         }
       });
     } else {
       respond(false, {
-        reason: 'Invalid client ID.'
+        reason: REJECTION_REASONS.params
       });
       kickClient('handshake rejected');
     }
