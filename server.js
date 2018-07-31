@@ -334,8 +334,8 @@ io.on('connection', (socket) => {
           if (poll) {
             if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === MASTER_PASS) {
               const admin = data.password === MASTER_PASS;
-              UNLOCKED[data.id] = {
-                socketId: SOCKET_ID,
+              UNLOCKED[SOCKET_ID] = {
+                id: data.id,
                 admin
               };
               // return data to client requesting it
@@ -358,14 +358,14 @@ io.on('connection', (socket) => {
       registerListener('save poll', (data, respond) => {
         // match client-side validation
         const options = data.options.filter((option) => option.name.trim());
-        if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID && data.topic && options.length >= 2) {
+        if (UNLOCKED[SOCKET_ID] && UNLOCKED[SOCKET_ID].id === data.id && data.topic && options.length >= 2) {
           const dbData = {
             updated_at: Date.now(),
             topic: emojiStrip(data.topic),
             public: data.public ? 1 : 0
           };
           // only allow admins to change certain props
-          if (UNLOCKED[data.id].admin) {
+          if (UNLOCKED[SOCKET_ID].admin) {
             dbData.one_vote_per_ip = data.one_vote_per_ip ? 1 : 0;
             dbData.allow_editing = data.allow_editing ? 1 : 0;
           }
@@ -380,13 +380,13 @@ io.on('connection', (socket) => {
               return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
             })
             // delete options from before that have been removed
-            .then(() => data.removed_options.length ? query('DELETE FROM options WHERE id IN (?)', [data.removed_options]) : Promise.resolve())
+            .then(() => data.removed_options.length ? query('DELETE FROM options WHERE poll_id = ? AND id IN (?)', [data.id, data.removed_options]) : Promise.resolve())
             // change names of options from before
-            .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE id = ?', [{
+            .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE poll_id = ? AND id = ?', [{
               updated_at: Date.now(),
               position: option.position,
               name: emojiStrip(option.name)
-            }, option.id]))))
+            }, data.id, option.id]))))
             // add new options
             .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
               id: uuidv4(),
@@ -398,10 +398,10 @@ io.on('connection', (socket) => {
             }, option.id]))))
             .then(() => {
               // only allow admins to insert fake votes
-              if (UNLOCKED[data.id].admin) {
+              if (UNLOCKED[SOCKET_ID].admin) {
                 let remainingQueries = QUERY_LIMIT;
                 const promises = [];
-                return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id], true)
+                return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE poll_id = ? AND option_id = ?', [data.id, option.id], true)
                   .then((result) => {
                     const voteCount = result['COUNT(*)'];
                     // the new vote count is higher than the current count, votes need to be added to the db
@@ -419,7 +419,7 @@ io.on('connection', (socket) => {
                       remainingQueries -= option.votes - voteCount;
                     } else {
                       // otherwise, votes need to be deleted from the db
-                      promises.push(query('DELETE FROM votes WHERE option_id = ? LIMIT ?', [option.id, voteCount - option.votes]));
+                      promises.push(query('DELETE FROM votes WHERE poll_id = ? AND option_id = ? LIMIT ?', [data.id, option.id, voteCount - option.votes]));
                     }
                   }))).then(() => Promise.all(promises));
               } else {
@@ -430,11 +430,8 @@ io.on('connection', (socket) => {
             .then((pollData) => {
               // announce
               sendFrame(data.id, 'poll data', pollData);
+              sendPublicPolls('everyone');
               respond(true);
-
-              if (data.public) {
-                sendPublicPolls('everyone');
-              }
             });
         } else {
           respond(false, {
@@ -444,7 +441,7 @@ io.on('connection', (socket) => {
       });
 
       registerListener('delete poll', (data, respond) => {
-        if (UNLOCKED[data.id] && UNLOCKED[data.id].socketId === SOCKET_ID) {
+        if (UNLOCKED[SOCKET_ID] && UNLOCKED[SOCKET_ID].id === data.id) {
           let isPublic = false;
           query('SELECT public FROM polls WHERE id = ?', [data.id], true)
             .then((poll) => {
