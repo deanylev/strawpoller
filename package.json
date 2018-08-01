@@ -8,6 +8,7 @@
     "mysql": "^2.15.0",
     "password-hash": "^1.2.2",
     "socket.io": "^2.1.1",
+    "socketio-wildcard": "^2.0.0",
     "uuid": "^3.2.1"
   }
 }

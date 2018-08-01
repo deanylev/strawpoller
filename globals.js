@@ -32,7 +32,8 @@ module.exports.REJECTION_REASONS = {
   password: 'Password incorrect.',
   existence: 'Poll not found.',
   auth: 'Unauthorised.',
-  password: 'Password incorrect.'
+  password: 'Password incorrect.',
+  listener: 'No listener.'
 };
 
 module.exports.HANDSHAKE_WAIT_TIME = 10000;

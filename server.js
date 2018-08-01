@@ -7,6 +7,7 @@ const uuidv4 = require('uuid/v4');
 const mysql = require('mysql');
 const emojiStrip = require('emoji-strip');
 const passwordHash = require('password-hash');
+const ioWildcard = require('socketio-wildcard');
 
 // constants
 const {
@@ -24,6 +25,8 @@ const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const pool = mysql.createPool(DB_CREDS);
+
+io.use(ioWildcard());
 
 // promise which resolves with the query results
 const query = (query, values, singleRow) => {
@@ -134,6 +137,8 @@ http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 
 // keeps track of what polls are authenticated for editing to which users
 const AUTHENTICATED = {};
+// keeps track of socket event listeners
+const LISTENERS = [];
 
 io.on('connection', (socket) => {
   let CLIENT_ID = null;
@@ -156,24 +161,18 @@ io.on('connection', (socket) => {
     }
   };
   const registerListener = (name, callback, once) => {
+    LISTENERS.push(name);
     socket[once ? 'once' : 'on'](name, (data = {}, ack) => {
       if (typeof data !== 'object' || data === null || typeof ack !== 'function') {
-        logger.warn('socket', 'dropping invalid frame', {
+        logger.warn('socket', 'dropping frame', {
           socketId: SOCKET_ID,
           name,
           data,
-          ack
+          ack,
+          reason: REJECTION_REASONS.params
         });
         return;
       }
-
-      const cleanData = {};
-      Object.keys(data).forEach((key) => cleanData[key] = key === 'password' ? 'REDACTED' : data[key]);
-      logger.log('socket', 'received frame', {
-        socketId: SOCKET_ID,
-        name,
-        data: cleanData
-      });
 
       try {
         callback(data, (success, data) => {
@@ -206,7 +205,7 @@ io.on('connection', (socket) => {
   };
 
   // promise which resolves with the topic, options and vote counts for a poll
-  const getPollData = (id, unique, privateInfo) => {
+  const getPollData = (id, unique, allFields) => {
     const retOptions = [];
     const selected = [];
     let options = null;
@@ -248,10 +247,9 @@ io.on('connection', (socket) => {
           });
         }
 
-        return {
+        const obj = {
           topic: poll.topic,
           locked: !!poll.locked,
-          one_vote_per_ip: privateInfo ? !!poll.one_vote_per_ip : null,
           allow_editing: !!poll.allow_editing,
           public: !!poll.public,
           options: retOptions.map((option) => Object.assign(option, {
@@ -259,6 +257,12 @@ io.on('connection', (socket) => {
           })),
           selected: unique ? selected : null
         };
+
+        if (allFields) {
+          obj.one_vote_per_ip = !!poll.one_vote_per_ip;
+        }
+
+        return obj;
       });
   };
 
@@ -274,6 +278,27 @@ io.on('connection', (socket) => {
     id: SOCKET_ID,
     ip: CLIENT_IP
   }));
+
+  socket.on('*', (packet) => {
+    const name = packet.data[0];
+    const data = typeof packet.data[1] === 'object' && packet.data[1] !== null ? packet.data[1] : {};
+    const cleanData = {};
+    Object.keys(data).forEach((key) => cleanData[key] = key === 'password' ? 'REDACTED' : data[key]);
+    logger.log('socket', 'received frame', {
+      socketId: SOCKET_ID,
+      name,
+      data: cleanData
+    });
+
+    if (!LISTENERS.includes(name)) {
+      logger.warn('socket', 'dropping frame', {
+        socketId: SOCKET_ID,
+        name,
+        data,
+        reason: REJECTION_REASONS.listener
+      });
+    }
+  });
 
   // kick client if no handshake within specified period
   setTimeout(() => {

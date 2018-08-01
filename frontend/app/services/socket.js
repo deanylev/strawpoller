@@ -3,7 +3,11 @@
 import Ember from 'ember';
 import config from '../config/environment';
 
+const DEFAULT_LISTENERS = ['connect', 'disconnect'];
+
 export default Ember.Service.extend({
+  logger: Ember.inject.service(),
+
   socket: null,
   connected: false,
   disconnected: Ember.computed.not('connected'),
@@ -13,6 +17,7 @@ export default Ember.Service.extend({
   allPolls: null,
 
   connectedDidChange: Ember.observer('connected', function() {
+    this.get('logger').warn('socket', `socket is now ${this.get('connected') ? 'connected' : 'disconnected'}`);
     if (this.get('connected')) {
       this._getClientId().then((clientId) => this.handshake(clientId)).then(() => this.set('isHandshook', true));
     }
@@ -47,10 +52,22 @@ export default Ember.Service.extend({
 
   _sendFrame(name, data) {
     return new Ember.RSVP.Promise((resolve, reject) => {
+      this.get('logger').log('socket', 'sending frame', {
+        name,
+        data
+      });
       this.get('socket').emit(name, data, (success, serverData) => {
         if (success) {
+          this.get('logger').log('socket', 'frame accepted', {
+            name,
+            data: serverData || {}
+          });
           resolve(serverData);
         } else {
+          this.get('logger').warn('socket', 'frame rejected', {
+            name,
+            data: serverData || {}
+          });
           reject(serverData);
         }
       });
@@ -58,7 +75,15 @@ export default Ember.Service.extend({
   },
 
   registerListener(name, callback) {
-    this.get('socket').on(name, callback);
+    this.get('socket').on(name, (data) => {
+      if (!DEFAULT_LISTENERS.includes(name)) {
+        this.get('logger').log('socket', 'received frame', {
+          name,
+          data: data || {}
+        });
+      }
+      callback(data);
+    });
   },
 
   unregisterListener(name, callback) {
@@ -66,7 +91,15 @@ export default Ember.Service.extend({
   },
 
   registerOnce(name, callback) {
-    this.get('socket').once(name, callback);
+    this.get('socket').once(name, (data) => {
+      if (!DEFAULT_LISTENERS.includes(name)) {
+        this.get('logger').log('socket', 'received frame', {
+          name,
+          data: data || {}
+        });
+      }
+      callback(data);
+    });
   },
 
   handshake(clientId) {
