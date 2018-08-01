@@ -413,13 +413,14 @@ io.on('connection', (socket) => {
                     const voteCount = result['COUNT(*)'];
                     // the new vote count is higher than the current count, votes need to be added to the db
                     if (option.votes > voteCount) {
+                      console.warn('a')
                       for (let i = 0; i < Math.min(option.votes - voteCount, remainingQueries); i++) {
                         promises.push(query('INSERT INTO votes SET ?', {
                           id: uuidv4(),
                           created_at: Date.now(),
                           poll_id: data.id,
                           option_id: option.id,
-                          client_id: CLIENT_ID,
+                          client_id: 'ADMIN',
                           ip_address: 'ADMIN'
                         }));
                       }
@@ -464,21 +465,18 @@ io.on('connection', (socket) => {
 
       registerListener('delete poll', (data, respond) => {
         if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
-          let isPublic = false;
-          query('SELECT public FROM polls WHERE id = ?', [data.id], true)
-            .then((poll) => {
-              isPublic = poll.public;
-              return query('DELETE FROM polls WHERE id = ?', [data.id])
-            })
-            .then(() => getPollData(data.id))
-            .then((pollData) => {
-              // announce
-              if (isPublic) {
-                sendPublicPolls('everyone');
-              }
-              sendFrame(data.id, 'poll data', pollData);
-              respond(true);
-            });
+          let pollData = null;
+          getPollData(data.id).then((result) => {
+            pollData = result;
+            return query('DELETE FROM polls WHERE id = ?', [data.id]);
+          }).then(() => {
+            // announce
+            if (pollData.public) {
+              sendPublicPolls('everyone');
+            }
+            sendFrame(data.id, 'poll data', pollData);
+            respond(true);
+          });
         } else {
           respond(false, {
             reason: REJECTION_REASONS.auth
