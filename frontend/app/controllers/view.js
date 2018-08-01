@@ -7,6 +7,7 @@ export default Ember.Controller.extend({
 
   topic: '',
   locked: false,
+  lockChanging: false,
   allowEditing: false,
 
   options: [],
@@ -20,6 +21,10 @@ export default Ember.Controller.extend({
   join: null,
 
   inFlight: false,
+
+  disabled: Ember.computed('inFlight', 'socket.disconnected', 'locked', 'lockChanging', 'selected', function() {
+    return this.get('inFlight') || this.get('socket.disconnected') || this.get('locked') || (this.get('lockChanging') && this.get('selected').length)
+  }),
 
   init() {
     this._super(...arguments);
@@ -40,6 +45,7 @@ export default Ember.Controller.extend({
       this.setProperties({
         topic: data.topic,
         locked: data.locked,
+        lockChanging: data.lock_changing,
         allowEditing: data.allow_editing,
         options: data.options,
         waitingForResponse: false
@@ -52,7 +58,7 @@ export default Ember.Controller.extend({
     this.set('join', () => {
       this.get('socket').joinPoll(pollId)
         .then(this.handleData)
-        .catch(() => this.set('topic', 'Poll not found.'))
+        .catch((err) => this.set('topic', err.reason))
         .finally(() => this.set('initialLoad', true))
     });
 
@@ -77,8 +83,13 @@ export default Ember.Controller.extend({
     vote(option) {
       const type = option.selected ? 'remove': 'add';
       this.set('inFlight', true);
-      return this.get('socket').vote(type, this.get('pollId'), option.id)
-        .finally(() => this.set('inFlight', false));
+      let promise = null;
+      if (!this.get('lockChanging') || confirm('Are you sure? You cannot change your vote.')) {
+        promise = this.get('socket').vote(type, this.get('pollId'), option.id);
+      } else {
+        promise = Ember.RSVP.reject();
+      }
+      return promise.finally(() => this.set('inFlight', false));
     }
   }
 });

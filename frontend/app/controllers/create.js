@@ -29,6 +29,7 @@ export default Ember.Controller.extend({
     this.setProperties({
       topic: '',
       oneVotePerIp: false,
+      lockChanging: false,
       allowEditing: false,
       editPassword: '',
       public: false,
@@ -55,6 +56,7 @@ export default Ember.Controller.extend({
       return this.get('socket').createPoll({
         topic: this.get('topic'),
         one_vote_per_ip: this.get('oneVotePerIp'),
+        lock_changing: this.get('lockChanging'),
         allow_editing: this.get('allowEditing'),
         public: this.get('public'),
         edit_password: this.get('editPassword'),

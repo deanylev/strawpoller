@@ -9,6 +9,7 @@ export default Ember.Controller.extend({
   topic: '',
   locked: false,
   oneVotePerIp: false,
+  lockChanging: false,
   allowEditing: false,
   editPassword: '',
   public: false,
@@ -28,6 +29,7 @@ export default Ember.Controller.extend({
     this._super(...arguments);
 
     this.setDefaults();
+    this.get('socket').registerListener('handshake', () => this.setDefaults());
   },
 
   setDefaults() {
@@ -46,6 +48,7 @@ export default Ember.Controller.extend({
           topic: data.topic,
           locked: data.locked,
           oneVotePerIp: data.one_vote_per_ip,
+          lockChanging: data.lock_changing,
           allowEditing: data.allow_editing,
           public: data.public,
           options: data.options,
@@ -73,6 +76,7 @@ export default Ember.Controller.extend({
         id: this.get('pollId'),
         topic: this.get('topic'),
         one_vote_per_ip: this.get('oneVotePerIp'),
+        lock_changing: this.get('lockChanging'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
         public: this.get('public'),
