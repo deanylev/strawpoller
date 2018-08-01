@@ -93,7 +93,7 @@ export default Ember.Controller.extend({
 
     deletePoll() {
       if (confirm('Are you sure? This cannot be undone.')) {
-        this.get('socket').deletePoll(this.get('pollId')).then(() => this.get('router').transitionTo('create'));
+        return this.get('socket').deletePoll(this.get('pollId')).then(() => this.get('router').transitionTo('create'));
       } else {
         return Ember.RSVP.reject();
       }
