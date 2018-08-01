@@ -490,18 +490,14 @@ io.on('connection', (socket) => {
 
       registerListener('delete poll', (data, respond) => {
         if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
-          let pollData = null;
-          getPollData(data.id).then((result) => {
-            pollData = result;
-            return query('DELETE FROM polls WHERE id = ?', [data.id]);
-          }).then(() => {
-            // announce
-            if (pollData.public) {
+          query('DELETE FROM polls WHERE id = ?', [data.id])
+            .then(() => getPollData(data.id))
+            .then((pollData) => {
+              // announce
               sendPublicPolls('everyone');
-            }
-            sendFrame(data.id, 'poll data', pollData);
-            respond(true);
-          });
+              sendFrame(data.id, 'poll data', pollData);
+              respond(true);
+            });
         } else {
           respond(false, {
             reason: REJECTION_REASONS.auth
