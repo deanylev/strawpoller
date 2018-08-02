@@ -1,6 +1,6 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   {{#link-to "create" class="navbar-brand"}}
-    <img class="nav-logo d-inline-block align-top" src="/logo.png" alt="Strawpoller Logo">
+    <img class="logo d-inline-block align-top" src="/logo.png" alt="Strawpoller Logo">
     Strawpoller
   {{/link-to}}
   {{#if (or socket.publicPolls socket.allPolls)}}
@@ -33,3 +33,16 @@
   {{/if}}
   <br>
 </div>
+<footer class="container pt-4 my-md-5 pt-md-5 border-top">
+  <div class="row text-center">
+    <div class="col-12 col-md">
+      <div class="footer-logo">
+        <img class="logo" src="/logo.png"><span>Strawpoller</span>
+      </div>
+      <p class="text-muted">A website by
+        <a href="https://deanlevinson.com.au" target="_blank">Dean Levinson</a>
+        &ndash; source on <a href="https://github.com/deanylev/strawpoller" target="_blank">GitHub</a>
+      </p>
+    </div>
+  </div>
+</footer>
