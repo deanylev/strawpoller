@@ -13,8 +13,8 @@ export default Ember.Service.extend({
   disconnected: Ember.computed.not('connected'),
   isHandshook: false,
 
-  publicPolls: null,
-  allPolls: null,
+  publicPolls: [],
+  allPolls: [],
 
   connectedDidChange: Ember.observer('connected', function() {
     this.get('logger').warn('socket', `socket is now ${this.get('connected') ? 'connected' : 'disconnected'}`);
