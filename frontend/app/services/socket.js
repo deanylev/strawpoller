@@ -13,12 +13,13 @@ export default Ember.Service.extend({
   disconnected: Ember.computed.not('connected'),
   isHandshook: false,
 
-  publicPolls: [],
-  allPolls: [],
+  publicPolls: null,
+  allPolls: null,
 
   connectedDidChange: Ember.observer('connected', function() {
-    this.get('logger').warn('socket', `socket is now ${this.get('connected') ? 'connected' : 'disconnected'}`);
-    if (this.get('connected')) {
+    const connected = this.get('connected');
+    this.get('logger')[connected ? 'log' : 'warn']('socket', `socket is now ${connected ? 'connected' : 'disconnected'}`);
+    if (connected) {
       this._getClientId().then((clientId) => this.handshake(clientId)).then(() => this.set('isHandshook', true));
     }
   }),

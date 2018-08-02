@@ -3,6 +3,8 @@
   {{#each socket.publicPolls as |poll|}}
     <h5>{{#link-to "view" poll.id class="listed-poll"}}{{poll.topic}}{{/link-to}}</h5>
   {{/each}}
+{{else if initialLoad}}
+  <h2>No public polls.</h2>
 {{else}}
   <h2>Loading...</h2>
 {{/if}}
