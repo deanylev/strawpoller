@@ -220,7 +220,7 @@ io.on('connection', (socket) => {
           poll = row;
           return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
         } else {
-          return Promise.reject();
+          return Promise.reject('poll not found');
         }
       }).then((rows) => {
         const promises = rows.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
@@ -511,11 +511,13 @@ io.on('connection', (socket) => {
           query('DELETE FROM polls WHERE id = ?', [data.id])
             .then(() => query('DELETE FROM options WHERE poll_id = ?', [data.id]))
             .then(() => query('DELETE FROM votes WHERE poll_id = ?', [data.id]))
-            .then(() => getPollData(data.id))
-            .then((pollData) => {
-              // announce
+            .then(() => {
               sendPublicPolls('everyone');
-              sendFrame(data.id, 'poll data', pollData);
+              // send fake poll data
+              sendFrame(data.id, 'poll data', {
+                topic: 'Poll deleted.',
+                options: []
+              });
               respond(true);
             });
         } else {
