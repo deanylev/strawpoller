@@ -421,7 +421,16 @@ io.on('connection', (socket) => {
               return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
             })
             // delete options from before that have been removed
-            .then(() => data.removed_options.length ? query('DELETE FROM options WHERE poll_id = ? AND id IN (?)', [data.id, data.removed_options]) : Promise.resolve())
+            .then(() => {
+              if (data.removed_options.length) {
+                return Promise.all([
+                  query('DELETE FROM options WHERE poll_id = ? AND id IN (?)', [data.id, data.removed_options]),
+                  query('DELETE FROM votes WHERE poll_id = ? AND option_id IN (?)', [data.id, data.removed_options])
+                ]);
+              } else {
+                return Promise.resolve();
+              }
+            })
             // change names of options from before
             .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE poll_id = ? AND id = ?', [{
               updated_at: Date.now(),
@@ -500,6 +509,8 @@ io.on('connection', (socket) => {
       registerListener('delete poll', (data, respond) => {
         if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
           query('DELETE FROM polls WHERE id = ?', [data.id])
+            .then(() => query('DELETE FROM options WHERE poll_id = ?', [data.id]))
+            .then(() => query('DELETE FROM votes WHERE poll_id = ?', [data.id]))
             .then(() => getPollData(data.id))
             .then((pollData) => {
               // announce
