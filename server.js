@@ -456,7 +456,6 @@ io.on('connection', (socket) => {
                     const voteCount = result['COUNT(*)'];
                     // the new vote count is higher than the current count, votes need to be added to the db
                     if (option.votes > voteCount) {
-                      console.warn('a')
                       for (let i = 0; i < Math.min(option.votes - voteCount, remainingQueries); i++) {
                         promises.push(query('INSERT INTO votes SET ?', {
                           id: uuidv4(),
