@@ -374,6 +374,11 @@ io.on('connection', (socket) => {
           if (poll) {
             if ((poll.allow_editing && passwordHash.verify(data.password, poll.edit_password)) || data.password === MASTER_PASS) {
               const admin = data.password === MASTER_PASS;
+              // unassign the poll if someone has else authenticated it before
+              const previous = Object.keys(AUTHENTICATED).find((socketId) => AUTHENTICATED[socketId].id === data.id);
+              if (previous) {
+                AUTHENTICATED[previous].id = null;
+              }
               AUTHENTICATED[SOCKET_ID] = {
                 id: data.id,
                 admin
