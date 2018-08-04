@@ -141,10 +141,9 @@ http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 
 // keeps track of what polls are authenticated for editing to which users
 const AUTHENTICATED = {};
-// keeps track of socket event listeners
-const LISTENERS = [];
 
 io.on('connection', (socket) => {
+  const LISTENERS = [];
   let CLIENT_ID = null;
   // Cloudflare messes with the connecting IP
   const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
