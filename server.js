@@ -105,16 +105,16 @@ createTable('polls', [
     type: 'tinyint(1)'
   },
   {
+    name: 'public',
+    type: 'tinyint(1)'
+  },
+  {
     name: 'allow_editing',
     type: 'tinyint(1)'
   },
   {
     name: 'edit_password',
     type: 'varchar(255)'
-  },
-  {
-    name: 'public',
-    type: 'tinyint(1)'
   }
 ]);
 
@@ -216,7 +216,7 @@ io.on('connection', (socket) => {
     const selected = [];
     let options = null;
     let poll = null;
-    return query('SELECT topic, locked, one_vote_per_ip, lock_changing, allow_editing, public FROM polls WHERE id = ?', [id], true)
+    return query('SELECT topic, locked, one_vote_per_ip, lock_changing, public, allow_editing FROM polls WHERE id = ?', [id], true)
       .then((row) => {
         if (row) {
           poll = row;
@@ -257,8 +257,8 @@ io.on('connection', (socket) => {
           topic: poll.topic,
           locked: !!poll.locked,
           lock_changing: !!poll.lock_changing,
-          allow_editing: !!poll.allow_editing,
           public: !!poll.public,
+          allow_editing: !!poll.allow_editing,
           options: retOptions.map((option) => Object.assign(option, {
             max: option.votes + QUERY_LIMIT
           })),
@@ -337,9 +337,9 @@ io.on('connection', (socket) => {
             locked: 0,
             one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             lock_changing: data.lock_changing ? 1 : 0,
+            public: data.public ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
-            edit_password: passwordHash.generate(data.edit_password || uuidv4()),
-            public: data.public ? 1 : 0
+            edit_password: passwordHash.generate(data.edit_password || uuidv4())
           }).then(() => Promise.all(options.map((option) => query('INSERT INTO options SET ?', {
             id: uuidv4(),
             created_at: Date.now(),

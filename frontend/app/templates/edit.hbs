@@ -19,6 +19,11 @@
       </div>
       <br>
       <div class="form-check">
+        {{input id="public" class="form-check-input" type="checkbox" checked=public}}
+        <label class="form-check-label" for="public">Public?</label>
+      </div>
+      <br>
+      <div class="form-check">
         {{input id="allow-editing" class="form-check-input" type="checkbox" checked=allowEditing}}
         <label class="form-check-label" for="allow-editing">Allow editing?</label>
       </div>
@@ -29,19 +34,19 @@
         <label class="form-check-label" for="lock_changing">Don't allow changing votes?</label>
       </div>
       <br>
+      <div class="form-check">
+        {{input id="public" class="form-check-input" type="checkbox" checked=public}}
+        <label class="form-check-label" for="public">Public?</label>
+      </div>
+      <br>
     {{/if}}
     {{#liquid-if allowEditing}}
       <div class="form-group">
         {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password (leave blank to keep unchanged)"}}
       </div>
-      <br>
     {{/liquid-if}}
-    <div class="form-check">
-      {{input id="public" class="form-check-input" type="checkbox" checked=public}}
-      <label class="form-check-label" for="public">Public?</label>
-    </div>
-    <br>
     {{#if (or options newOptions)}}
+      <br>
       <h2>Options</h2>
       {{#each options as |option index|}}
         <div class="form-group">
@@ -66,7 +71,7 @@
     <button class="btn btn-primary" {{action "addOption"}}>+ Add Option</button>
     <br><br>
     {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "savePoll") disabled=disabled}}Save{{/spin-button}}
-    {{#spin-button class="btn btn-warning btn-block btn-lg" buttonStyle="zoom-out" action=(action "changeLocked") disabled=disabled}}{{if locked "Unlock" "Lock"}} Poll Voting{{/spin-button}}
+    {{#spin-button class="btn btn-warning btn-block btn-lg" buttonStyle="zoom-out" action=(action "changeLocked") disabled=socket.disconnected}}{{if locked "Unlock" "Lock"}} Poll Voting{{/spin-button}}
     {{#spin-button class="btn btn-danger btn-block btn-lg" buttonStyle="zoom-out" action=(action "deletePoll") disabled=socket.disconnected}}Delete Poll{{/spin-button}}
     <br><br>
   {{else}}

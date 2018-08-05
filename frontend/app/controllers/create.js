@@ -30,9 +30,9 @@ export default Ember.Controller.extend({
       topic: '',
       oneVotePerIp: false,
       lockChanging: false,
+      public: false,
       allowEditing: false,
       editPassword: '',
-      public: false,
       options: []
     });
 
@@ -57,8 +57,8 @@ export default Ember.Controller.extend({
         topic: this.get('topic'),
         one_vote_per_ip: this.get('oneVotePerIp'),
         lock_changing: this.get('lockChanging'),
-        allow_editing: this.get('allowEditing'),
         public: this.get('public'),
+        allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
         options: this.get('options').filter((option) => option.name.trim()).map((option, index) => Object.assign({
           position: index
