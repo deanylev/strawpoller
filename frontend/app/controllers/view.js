@@ -58,7 +58,11 @@ export default Ember.Controller.extend({
     this.set('join', () => {
       this.get('socket').joinPoll(pollId)
         .then(this.handleData)
-        .catch((err) => this.set('topic', err.reason))
+        .catch((err) => {
+          this.set('topic', err.reason);
+          this.set('allowEditing', false);
+          this.set('options', []);
+        })
         .finally(() => this.set('initialLoad', true))
     });
 

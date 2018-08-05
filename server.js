@@ -219,7 +219,7 @@ io.on('connection', (socket) => {
           poll = row;
           return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
         } else {
-          return Promise.reject('poll not found');
+          return Promise.reject(REJECTION_REASONS.existence);
         }
       }).then((rows) => {
         const promises = rows.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
