@@ -105,6 +105,10 @@ createTable('polls', [
     type: 'tinyint(1)'
   },
   {
+    name: 'multiple_votes',
+    type: 'tinyint(1)'
+  },
+  {
     name: 'public',
     type: 'tinyint(1)'
   },
@@ -216,7 +220,7 @@ io.on('connection', (socket) => {
     const selected = [];
     let options = null;
     let poll = null;
-    return query('SELECT topic, locked, one_vote_per_ip, lock_changing, public, allow_editing FROM polls WHERE id = ?', [id], true)
+    return query('SELECT topic, locked, one_vote_per_ip, lock_changing, multiple_votes, public, allow_editing FROM polls WHERE id = ?', [id], true)
       .then((row) => {
         if (row) {
           poll = row;
@@ -257,6 +261,7 @@ io.on('connection', (socket) => {
           topic: poll.topic,
           locked: !!poll.locked,
           lock_changing: !!poll.lock_changing,
+          multiple_votes: !!poll.multiple_votes,
           public: !!poll.public,
           allow_editing: !!poll.allow_editing,
           options: retOptions.map((option) => Object.assign(option, {
@@ -329,7 +334,7 @@ io.on('connection', (socket) => {
         data.options.forEach((option, index) => option.name = option.name.trim());
         const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
         // match client-side validation
-        if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing)) {
+        if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing) && (!data.lock_changing || !data.multiple_votes)) {
           query('INSERT INTO polls SET ?', {
             id,
             created_at: Date.now(),
@@ -339,6 +344,7 @@ io.on('connection', (socket) => {
             locked: 0,
             one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             lock_changing: data.lock_changing ? 1 : 0,
+            multiple_votes: data.multiple_votes ? 1 : 0,
             public: data.public ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
             edit_password: passwordHash.generate(data.edit_password || uuidv4())
@@ -409,11 +415,12 @@ io.on('connection', (socket) => {
         const topic = data.topic.trim();
         data.options.forEach((option, index) => option.name = option.name.trim());
         const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
-        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && topic && options.length >= 2) {
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && topic && options.length >= 2 && (!data.lock_changing || !data.multiple_votes)) {
           const dbData = {
             updated_at: Date.now(),
             topic: emojiStrip(topic),
-            lock_changing: data.lock_changing,
+            lock_changing: data.lock_changing ? 1 : 0,
+            multiple_votes: data.multiple_votes ? 1 : 0,
             public: data.public ? 1 : 0
           };
           // only allow admins to change certain props
@@ -541,7 +548,7 @@ io.on('connection', (socket) => {
       registerListener('vote', (data, respond) => {
         const { type, pollId, optionId } = data;
         let poll = null;
-        query('SELECT locked, one_vote_per_ip, lock_changing FROM polls WHERE id = ?', [pollId], true).then((row) => {
+        query('SELECT locked, one_vote_per_ip, lock_changing, multiple_votes FROM polls WHERE id = ?', [pollId], true).then((row) => {
           poll = row;
           if (poll.locked) {
             respond(false, {
@@ -562,7 +569,13 @@ io.on('connection', (socket) => {
           if (type === 'add') {
             return query('SELECT id FROM options WHERE poll_id = ?', [pollId])
               // delete any existing votes from the same ip and/or client to prevent duplicates
-              .then((options) => Promise.all(options.map((option) => query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [option.id, CLIENT_IP, CLIENT_ID]))))
+              .then((options) => {
+                if (poll.multiple_votes) {
+                  return query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [optionId, CLIENT_IP, CLIENT_ID]);
+                } else {
+                  return Promise.all(options.map((option) => query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [option.id, CLIENT_IP, CLIENT_ID])))
+                }
+              })
               // add the new vote
               .then(() => query('INSERT INTO votes SET ?', {
                 id: uuidv4(),

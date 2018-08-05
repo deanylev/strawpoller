@@ -14,8 +14,14 @@
       </div>
       <br>
       <div class="form-check">
-        {{input id="lock_changing" class="form-check-input" type="checkbox" checked=lockChanging}}
+        {{input id="lock_changing" class="form-check-input" type="checkbox" checked=lockChanging disabled=multipleVotes}}
         <label class="form-check-label" for="lock_changing">Don't allow changing votes?</label>
+      </div>
+      <br>
+      <div class="form-check">
+        {{input id="multiple_votes" class="form-check-input" type="checkbox" checked=multipleVotes disabled=lockChanging}}
+        <label class="form-check-label" for="multiple_votes">Allow voting for multiple options?</label>
+        <p class="text-danger">Warning: disabling this on a poll that has already been voted on is likely to mess up what existing voters will see. Proceed with caution.</p>
       </div>
       <br>
       <div class="form-check">
@@ -30,8 +36,14 @@
       <br>
     {{else}}
       <div class="form-check">
-        {{input id="lock_changing" class="form-check-input" type="checkbox" checked=lockChanging}}
+        {{input id="lock_changing" class="form-check-input" type="checkbox" checked=lockChanging disabled=multipleVotes}}
         <label class="form-check-label" for="lock_changing">Don't allow changing votes?</label>
+        <p class="text-danger">Warning: disabling this on a poll that has already been voted on is likely to mess up what existing voters will see. Proceed with caution.</p>
+      </div>
+      <br>
+      <div class="form-check">
+        {{input id="multiple_votes" class="form-check-input" type="checkbox" checked=multipleVotes disabled=lockChanging}}
+        <label class="form-check-label" for="multiple_votes">Allow voting for multiple options?</label>
       </div>
       <br>
       <div class="form-check">
