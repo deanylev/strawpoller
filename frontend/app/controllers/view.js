@@ -47,8 +47,7 @@ export default Ember.Controller.extend({
         locked: data.locked,
         lockChanging: data.lock_changing,
         allowEditing: data.allow_editing,
-        options: data.options,
-        waitingForResponse: false
+        options: data.options
       });
       if (data.selected) {
         this.set('selected', data.selected);
