@@ -68,7 +68,10 @@ export default Ember.Controller.extend({
     this.join();
 
     this.get('socket').registerListener('poll data', this.handleData);
-    this.get('socket').registerListener('handshake', this.join);
+    // don't call join on the initial handshake
+    this.get('socket').registerOnce('handshake', () => {
+      this.get('socket').registerListener('handshake', this.join);
+    });
   },
 
   unsubscribe() {
