@@ -534,13 +534,13 @@ io.on('connection', (socket) => {
       registerListener('vote', (data, respond) => {
         const { type, pollId, optionId } = data;
         let poll = null;
-        query('SELECT locked, one_vote_per_ip, lock_changing FROM polls WHERE id = ?', [pollId], true).then((row) =>  {
+        query('SELECT locked, one_vote_per_ip, lock_changing FROM polls WHERE id = ?', [pollId], true).then((row) => {
           poll = row;
           if (poll.locked) {
             respond(false, {
               reason: REJECTION_REASONS.auth
             });
-            return;
+            return Promise.reject();
           }
 
           return query(`SELECT COUNT(1) FROM votes WHERE poll_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [pollId, CLIENT_IP, CLIENT_ID], true);
@@ -549,11 +549,11 @@ io.on('connection', (socket) => {
             respond(false, {
               reason: REJECTION_REASONS.auth
             });
-            return;
+            return Promise.reject();
           }
 
           if (type === 'add') {
-            query('SELECT id FROM options WHERE poll_id = ?', [pollId])
+            return query('SELECT id FROM options WHERE poll_id = ?', [pollId])
               // delete any existing votes from the same ip and/or client to prevent duplicates
               .then((options) => Promise.all(options.map((option) => query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [option.id, CLIENT_IP, CLIENT_ID]))))
               // add the new vote
@@ -564,30 +564,23 @@ io.on('connection', (socket) => {
                 option_id: optionId,
                 client_id: CLIENT_ID,
                 ip_address: CLIENT_IP
-              })).then(() => Promise.all([
-                getPollData(pollId),
-                getPollData(pollId, true)
-              ])).then((values) => {
-                // announce
-                [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', values[index]));
-                respond(true);
-              });
+              }));
           } else if (type === 'remove') {
-            query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [optionId, CLIENT_IP, CLIENT_ID])
-              .then(() => getPollData(pollId, true)).then((fullData) => {
-                const generalData = {};
-                Object.assign(generalData, fullData);
-                delete generalData.selected;
-                const data = [fullData, generalData];
-                // announce
-                [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', data[index]));
-                respond(true);
-            });
+            return query(`DELETE FROM votes WHERE option_id = ? AND ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [optionId, CLIENT_IP, CLIENT_ID]);
           } else {
             respond(false, {
               reason: REJECTION_REASONS.params
             });
+            return Promise.reject();
           }
+        }).then(() => getPollData(pollId, true)).then((fullData) => {
+          const generalData = {};
+          Object.assign(generalData, fullData);
+          delete generalData.selected;
+          const data = [fullData, generalData];
+          // announce
+          [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', data[index]));
+          respond(true);
         });
       });
 
