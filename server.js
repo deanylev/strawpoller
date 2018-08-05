@@ -325,27 +325,29 @@ io.on('connection', (socket) => {
 
       registerListener('create poll', (data, respond) => {
         const id = uuidv4();
-        const options = data.options.filter((option) => option.name.trim());
+        const topic = data.topic.trim();
+        data.options.forEach((option, index) => option.name = option.name.trim());
+        const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
         // match client-side validation
-        if (data.topic && options.length >= 2 && (data.edit_password || !data.allow_editing)) {
+        if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing)) {
           query('INSERT INTO polls SET ?', {
             id,
             created_at: Date.now(),
             updated_at: Date.now(),
             ip_address: CLIENT_IP,
-            topic: emojiStrip(data.topic),
+            topic: emojiStrip(topic),
             locked: 0,
             one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             lock_changing: data.lock_changing ? 1 : 0,
             public: data.public ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
             edit_password: passwordHash.generate(data.edit_password || uuidv4())
-          }).then(() => Promise.all(options.map((option) => query('INSERT INTO options SET ?', {
+          }).then(() => Promise.all(options.map((option, position) => query('INSERT INTO options SET ?', {
             id: uuidv4(),
             created_at: Date.now(),
             updated_at: Date.now(),
             poll_id: id,
-            position: option.position,
+            position,
             name: emojiStrip(option.name)
           })))).then(() => respond(true, {
             id
@@ -404,11 +406,13 @@ io.on('connection', (socket) => {
 
       registerListener('save poll', (data, respond) => {
         // match client-side validation
-        const options = data.options.filter((option) => option.name.trim());
-        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && data.topic && options.length >= 2) {
+        const topic = data.topic.trim();
+        data.options.forEach((option, index) => option.name = option.name.trim());
+        const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && topic && options.length >= 2) {
           const dbData = {
             updated_at: Date.now(),
-            topic: emojiStrip(data.topic),
+            topic: emojiStrip(topic),
             lock_changing: data.lock_changing,
             public: data.public ? 1 : 0
           };

@@ -4,15 +4,23 @@ export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
 
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
+  disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic').trim()
     // must have at least two options that aren't blank
-    && this.get('options').filter((option) => option.name.trim()).length >= 2
+    && this.get('filteredOptions').length >= 2
+    // options must be unique
+    && this.get('filteredOptions').filter((o1, i, arr) => arr.map((o2) => o2.name).indexOf(o1.name) === i).length === this.get('filteredOptions').length
     // password can't be blank if allowing editing
     && (this.get('editPassword') || !this.get('allowEditing'))
     // must be connected to the server
     && this.get('socket.connected'));
+  }),
+
+  filteredOptions: Ember.computed('options.[]', 'options.@each.name', function() {
+    const options = Ember.copy(this.get('options'), true);
+    options.forEach((option) => option.name = option.name.trim());
+    return options.filter((option) => option.name);
   }),
 
   allowEditingDidChange: Ember.observer('allowEditing', function() {
@@ -60,9 +68,7 @@ export default Ember.Controller.extend({
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
-        options: this.get('options').filter((option) => option.name.trim()).map((option, index) => Object.assign({
-          position: index
-        }, option))
+        options: this.get('filteredOptions'),
       }).then((data) => this.get('router').transitionTo('view', data.id)).then(() => this.setDefaults());
     },
 

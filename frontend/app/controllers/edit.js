@@ -14,15 +14,22 @@ export default Ember.Controller.extend({
   allowEditing: false,
   editPassword: '',
   options: null,
-  newOptions: [],
-  removedOptions: [],
-  disabled: Ember.computed('topic', 'options.[]', 'options.@each.name', 'newOptions.[]', 'newOptions.@each.name', 'socket.connected', function() {
+
+  disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic').trim()
     // must have at least two options that aren't blank
-    && this.get('options').concat(this.get('newOptions')).filter((option) => option.name.trim()).length >= 2
+    && this.get('filteredOptions').length >= 2
+    // options must be unique
+    && this.get('filteredOptions').filter((o1, i, arr) => arr.map((o2) => o2.name).indexOf(o1.name) === i).length === this.get('filteredOptions').length
     // must be connected to the server
     && this.get('socket.connected'));
+  }),
+
+  filteredOptions: Ember.computed('options.[]', 'options.@each.name', 'newOptions.[]', 'newOptions.@each.name', function() {
+    const options = Ember.copy(this.get('options'), true).concat(Ember.copy(this.get('newOptions'), true));
+    options.forEach((option) => option.name = option.name.trim());
+    return options.filter((option) => option.name);
   }),
 
   init() {
@@ -36,7 +43,9 @@ export default Ember.Controller.extend({
     this.setProperties({
       authenticated: false,
       password: '',
-      error: ''
+      error: '',
+      newOptions: [],
+      removedOptions: []
     });
   },
 
@@ -80,9 +89,7 @@ export default Ember.Controller.extend({
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
-        options: this.get('options')
-          .concat(this.get('newOptions')
-          .filter((option) => option.name.trim()))
+        options: this.get('filteredOptions')
           .map((option, index) => Object.assign({
             position: index
           }, option)),
