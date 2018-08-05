@@ -584,7 +584,7 @@ io.on('connection', (socket) => {
           const generalData = {};
           Object.assign(generalData, fullData);
           delete generalData.selected;
-          const data = [fullData, generalData];
+          const data = [generalData, fullData];
           // announce
           [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', data[index]));
           respond(true);
