@@ -143,7 +143,7 @@ http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 const AUTHENTICATED = {};
 
 io.on('connection', (socket) => {
-  const LISTENERS = [];
+  const LISTENERS = new Set();
   let CLIENT_ID = null;
   // Cloudflare messes with the connecting IP
   const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
@@ -164,8 +164,11 @@ io.on('connection', (socket) => {
     }
   };
   const registerListener = (name, callback, once) => {
-    LISTENERS.push(name);
+    LISTENERS.add(name);
     socket[once ? 'once' : 'on'](name, (data = {}, ack) => {
+      if (once) {
+        LISTENERS.delete(name);
+      }
       if (typeof data !== 'object' || data === null || typeof ack !== 'function') {
         logger.warn('socket', 'dropping frame', {
           socketId: SOCKET_ID,
@@ -294,7 +297,7 @@ io.on('connection', (socket) => {
       data: cleanData
     });
 
-    if (!LISTENERS.includes(name)) {
+    if (!LISTENERS.has(name)) {
       logger.warn('socket', 'dropping frame', {
         socketId: SOCKET_ID,
         name,
