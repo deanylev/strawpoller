@@ -7,6 +7,16 @@
     {{input id="topic" class="form-control" type="text" value=topic}}
   </div>
   <br>
+  {{#if options}}
+    <h2>Options</h2>
+    <br>
+    {{#each options as |option index|}}
+      <div class="form-group">
+        {{input class="form-control" type="text" value=option.name placeholder="Enter an option" focusIn=(action "optionFocusIn" index) focusOut=(action "optionFocusOut" index)}}
+      </div>
+    {{/each}}
+  {{/if}}
+  <br>
   <div class="form-check">
     {{input id="vote-per-ip" class="form-check-input" type="checkbox" checked=oneVotePerIp}}
     <label class="form-check-label" for="vote-per-ip" title="If enabled, one vote will be allowed per IP address. Otherwise, one vote per browser per IP address will be allowed.">Limit to one vote per IP address?</label>
@@ -49,16 +59,6 @@
       {{/power-calendar}}
     {{/liquid-if}}
   </div>
-  <br>
-  {{#if options}}
-    <h2>Options</h2>
-    <br>
-    {{#each options as |option index|}}
-      <div class="form-group">
-        {{input class="form-control" type="text" value=option.name placeholder="Enter an option" focusIn=(action "optionFocusIn" index) focusOut=(action "optionFocusOut" index)}}
-      </div>
-    {{/each}}
-  {{/if}}
   <br>
   {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "createPoll") disabled=disabled}}Create{{/spin-button}}
 </form>
