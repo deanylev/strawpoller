@@ -1,8 +1,15 @@
 import Ember from 'ember';
 
+const ONE_DAY = 86400000;
+const ONE_DAY_FROM_NOW = new Date(Date.now() + ONE_DAY);
+
 export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
+
+  center: ONE_DAY_FROM_NOW,
+  minDate: new Date(),
+  maxDate: new Date(Date.now() + 20 * ONE_DAY),
 
   disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
@@ -42,6 +49,8 @@ export default Ember.Controller.extend({
       public: false,
       allowEditing: false,
       editPassword: '',
+      lockVoting: false,
+      unlockAt: ONE_DAY_FROM_NOW,
       options: []
     });
 
@@ -70,6 +79,7 @@ export default Ember.Controller.extend({
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
+        unlock_at: this.get('lockVoting') ? +this.get('unlockAt') : null,
         options: this.get('filteredOptions'),
       }).then((data) => this.get('router').transitionTo('view', data.id)).then(() => this.setDefaults());
     },

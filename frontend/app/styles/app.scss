@@ -1,5 +1,6 @@
 @import "ember-cli-bootstrap-4/bootstrap";
 @import "spin-button";
+@import "ember-power-calendar";
 
 .logo {
   width: 30px;
@@ -19,4 +20,13 @@
   }
 
   @extend .text-dark;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+.ember-power-calendar {
+  margin: 0 auto;
+  @include ember-power-calendar($cell-size: 50px);
 }

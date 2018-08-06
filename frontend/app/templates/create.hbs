@@ -3,21 +3,23 @@
   <h1>Create Poll</h1>
   <br>
   <div class="form-group">
-    {{input class="form-control" type="text" value=topic placeholder="Enter your topic"}}
+    <label class="bold" for="topic">Topic</label>
+    {{input id="topic" class="form-control" type="text" value=topic}}
   </div>
+  <br>
   <div class="form-check">
     {{input id="vote-per-ip" class="form-check-input" type="checkbox" checked=oneVotePerIp}}
     <label class="form-check-label" for="vote-per-ip" title="If enabled, one vote will be allowed per IP address. Otherwise, one vote per browser per IP address will be allowed.">Limit to one vote per IP address?</label>
   </div>
   <br>
   <div class="form-check">
-    {{input id="lock_changing" class="form-check-input" type="checkbox" checked=lockChanging disabled=multipleVotes}}
-    <label class="form-check-label" for="lock_changing">Don't allow changing votes?</label>
+    {{input id="lock-changing" class="form-check-input" type="checkbox" checked=lockChanging disabled=multipleVotes}}
+    <label class="form-check-label" for="lock-changing">Don't allow changing votes?</label>
   </div>
   <br>
   <div class="form-check">
-    {{input id="multiple_votes" class="form-check-input" type="checkbox" checked=multipleVotes disabled=lockChanging}}
-    <label class="form-check-label" for="multiple_votes">Allow voting for multiple options?</label>
+    {{input id="multiple-votes" class="form-check-input" type="checkbox" checked=multipleVotes disabled=lockChanging}}
+    <label class="form-check-label" for="multiple-votes">Allow voting for multiple options?</label>
   </div>
   <br>
   <div class="form-check">
@@ -35,6 +37,18 @@
       {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password"}}
     </div>
   {{/liquid-if}}
+  <br>
+  <div class="form-group">
+    {{input id="lock-voting" class="form-check-input" type="checkbox" checked=lockVoting}}
+    <label class="form-check-label" for="lock-voting">Lock voting until a specified date?</label>
+    {{#liquid-if lockVoting}}
+      <br>
+      {{#power-calendar selected=unlockAt center=center onSelect=(action (mut unlockAt) value="date") onCenterChange=(action (mut center) value="date") as |calendar|}}
+        {{calendar.nav}}
+        {{calendar.days minDate=minDate maxDate=maxDate}}
+      {{/power-calendar}}
+    {{/liquid-if}}
+  </div>
   <br>
   {{#if options}}
     <h2>Options</h2>

@@ -1,8 +1,15 @@
 import Ember from 'ember';
 
+const ONE_DAY = 86400000;
+const ONE_DAY_FROM_NOW = new Date(Date.now() + ONE_DAY);
+
 export default Ember.Controller.extend({
   router: Ember.inject.service(),
   socket: Ember.inject.service(),
+
+  center: null,
+  minDate: new Date(),
+  maxDate: new Date(Date.now() + 20 * ONE_DAY),
 
   admin: false,
 
@@ -14,6 +21,8 @@ export default Ember.Controller.extend({
   public: false,
   allowEditing: false,
   editPassword: '',
+  lockVoting: false,
+  unlockAt: null,
   options: null,
 
   disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'socket.connected', function() {
@@ -31,6 +40,10 @@ export default Ember.Controller.extend({
     const options = Ember.copy(this.get('options'), true).concat(Ember.copy(this.get('newOptions'), true));
     options.forEach((option) => option.name = option.name.trim());
     return options.filter((option) => option.name);
+  }),
+
+  allowEditingDidChange: Ember.observer('allowEditing', function() {
+    this.set('editPassword', '');
   }),
 
   init() {
@@ -51,9 +64,16 @@ export default Ember.Controller.extend({
   },
 
   actions: {
+    updateUnlockAt(dateTime) {
+      this.set('unlockAt', +dateTime);
+    },
+
     submitPassword() {
       return this.get('socket').authenticatePoll(this.get('pollId'), this.get('password')).then((data) => {
+        const lockVoting = data.unlock_at && new Date(data.unlock_at) > new Date();
+        const unlockAt = lockVoting ? data.unlock_at : ONE_DAY_FROM_NOW;
         this.setProperties({
+          center: unlockAt,
           admin: data.admin,
           topic: data.topic,
           locked: data.locked,
@@ -62,8 +82,10 @@ export default Ember.Controller.extend({
           multipleVotes: data.multiple_votes,
           public: data.public,
           allowEditing: data.allow_editing,
+          lockVoting,
+          unlockAt,
           options: data.options,
-          authenticated: true
+          authenticated: true,
         });
       }).catch((err) => this.set('error', err.reason));
     },
@@ -92,6 +114,7 @@ export default Ember.Controller.extend({
         public: this.get('public'),
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
+        unlock_at: this.get('lockVoting') ? +this.get('unlockAt') : null,
         options: this.get('filteredOptions')
           .map((option, index) => Object.assign({
             position: index

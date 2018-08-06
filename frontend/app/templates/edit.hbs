@@ -4,7 +4,8 @@
 <form>
   {{#if authenticated}}
     <div class="form-group">
-      {{textarea class="form-control" value=topic placeholder="Enter a topic"}}
+      <label class="bold" for="topic">Topic</label>
+      {{input id="topic" class="form-control" type="text" value=topic}}
     </div>
     {{#if admin}}
       <div class="form-check">
@@ -57,6 +58,18 @@
         {{input class="form-control" type="password" value=editPassword placeholder="Enter an edit password (leave blank to keep unchanged)"}}
       </div>
     {{/liquid-if}}
+    <br>
+    <div class="form-group">
+      {{input id="lock-voting" class="form-check-input" type="checkbox" checked=lockVoting}}
+      <label class="form-check-label" for="lock-voting">Lock voting until a specified date?</label>
+      {{#liquid-if lockVoting}}
+        <br>
+        {{#power-calendar selected=unlockAt center=center onSelect=(action (mut unlockAt) value="date") onCenterChange=(action (mut center) value="date") as |calendar|}}
+          {{calendar.nav}}
+          {{calendar.days minDate=minDate maxDate=maxDate}}
+        {{/power-calendar}}
+      {{/liquid-if}}
+    </div>
     {{#if (or options newOptions)}}
       <br>
       <h2>Options</h2>

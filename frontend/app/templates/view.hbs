@@ -2,9 +2,7 @@
   {{title "View Poll"}}
   {{title topic}}
   <h2>{{topic}}</h2>
-  {{#if locked}}
-    <p>(voting locked)</p>
-  {{/if}}
+  <p>{{votingLocked}}</p>
   {{#if options}}
   <br>
     {{#each displayedOptions as |option|}}

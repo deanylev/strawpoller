@@ -9,6 +9,7 @@ export default Ember.Controller.extend({
   locked: false,
   lockChanging: false,
   allowEditing: false,
+  unlockAt: false,
 
   options: [],
   displayedOptions: Ember.computed('options', 'selected', function() {
@@ -24,6 +25,15 @@ export default Ember.Controller.extend({
 
   disabled: Ember.computed('inFlight', 'socket.disconnected', 'locked', 'lockChanging', 'selected', function() {
     return this.get('inFlight') || this.get('socket.disconnected') || this.get('locked') || (this.get('lockChanging') && this.get('selected').length)
+  }),
+
+  votingLocked: Ember.computed('locked', 'unlockAt', function() {
+    if (this.get('locked')) {
+      const lockedUntil = new Date(this.get('unlockAt')).toLocaleDateString();
+      return `(voting locked${this.get('unlockAt') > Date.now() ? ` until ${lockedUntil}` : ''})`;
+    } else {
+      return '';
+    }
   }),
 
   init() {
@@ -47,6 +57,7 @@ export default Ember.Controller.extend({
         locked: data.locked,
         lockChanging: data.lock_changing,
         allowEditing: data.allow_editing,
+        unlockAt: data.unlock_at,
         options: data.options
       });
       if (data.selected) {
@@ -59,6 +70,7 @@ export default Ember.Controller.extend({
         .then(this.handleData)
         .catch((err) => {
           this.set('topic', err.reason);
+          this.set('locked', false);
           this.set('allowEditing', false);
           this.set('options', []);
         })

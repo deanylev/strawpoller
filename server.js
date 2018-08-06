@@ -16,7 +16,8 @@ const {
   MASTER_PASS,
   DB_CREDS,
   HANDSHAKE_WAIT_TIME,
-  REJECTION_REASONS
+  REJECTION_REASONS,
+  MAXIMUM_UNLOCK_AT
 } = require('./globals');
 
 // config
@@ -119,6 +120,11 @@ createTable('polls', [
   {
     name: 'edit_password',
     type: 'varchar(255)'
+  },
+  {
+    name: 'unlock_at',
+    type: 'bigint(13)',
+    allowNull: true
   }
 ]);
 
@@ -145,12 +151,110 @@ http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
 
 // keeps track of what polls are authenticated for editing to which users
 const AUTHENTICATED = {};
+// keeps track of timeouts to unlock polls
+const TIMEOUTS = {};
+
+let CLIENT_IP = null;
+let CLIENT_ID = null;
+// promise which resolves with the topic, options and vote counts for a poll
+const getPollData = (id, unique, allFields) => {
+  const retOptions = [];
+  const selected = [];
+  let options = null;
+  let poll = null;
+  return query('SELECT topic, locked, one_vote_per_ip, lock_changing, multiple_votes, public, allow_editing, unlock_at FROM polls WHERE id = ?', [id], true)
+    .then((row) => {
+      if (row) {
+        poll = row;
+        return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
+      } else {
+        return Promise.reject(REJECTION_REASONS.existence);
+      }
+    }).then((rows) => {
+      const promises = rows.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
+      options = rows;
+      return Promise.all(promises);
+    }).then((values) => {
+      values.forEach((value, index) => {
+        const { id } = options[index];
+        retOptions.push({
+          id,
+          name: options[index].name,
+          votes: value[0]['COUNT(*)']
+        });
+      });
+
+      if (unique) {
+        return query(`SELECT option_id FROM votes WHERE ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [CLIENT_IP, CLIENT_ID]);
+      } else {
+        return Promise.resolve();
+      }
+    }).then((votes) => {
+      if (votes) {
+        votes.forEach((vote) => {
+          const option = retOptions.find((option) => option.id === vote.option_id);
+          if (option) {
+            selected.push(option.id);
+          }
+        });
+      }
+
+      const obj = {
+        topic: poll.topic,
+        locked: !!poll.locked,
+        lock_changing: !!poll.lock_changing,
+        multiple_votes: !!poll.multiple_votes,
+        public: !!poll.public,
+        allow_editing: !!poll.allow_editing,
+        unlock_at: poll.unlock_at,
+        options: retOptions.map((option) => Object.assign(option, {
+          max: option.votes + QUERY_LIMIT
+        })),
+        selected: unique ? selected : null
+      };
+
+      if (allFields) {
+        obj.one_vote_per_ip = !!poll.one_vote_per_ip;
+      }
+
+      return obj;
+    });
+};
+
+const schedulePollUnlock = (id, at) => {
+  logger.log('server', 'scheduled poll to unlock', {
+    id,
+    at: new Date(at).toGMTString()
+  });
+  TIMEOUTS[id] = setTimeout(() => {
+    query('UPDATE polls SET ? WHERE locked = 1 AND id = ?', [{
+      locked: 0
+    }, id]).then((results) => {
+      if (results.affectedRows) {
+        logger.log('server', 'automatically unlocked poll', {
+          id
+        });
+        getPollData(id).then((pollData) => io.to(id).emit('poll data', pollData));
+      }
+    });
+  }, at - Date.now());
+};
+const cancelPollUnlock = (id) => {
+  logger.log('server', 'cancelled poll unlock', {
+    id
+  });
+  clearTimeout(TIMEOUTS[id]);
+};
+
+// set polls to unlock on schedule
+query('SELECT id, unlock_at FROM polls WHERE unlock_at >= ?', [Date.now()]).then((polls) => {
+  polls.forEach((poll) => schedulePollUnlock(poll.id, poll.unlock_at));
+});
 
 io.on('connection', (socket) => {
   const LISTENERS = new Set();
-  let CLIENT_ID = null;
   // Cloudflare messes with the connecting IP
-  const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
+  CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const SOCKET_ID = socket.id;
   const sendFrame = (target, name, data) => {
     logger.log('socket', 'sending frame', {
@@ -214,70 +318,6 @@ io.on('connection', (socket) => {
     socket.disconnect();
   };
 
-  // promise which resolves with the topic, options and vote counts for a poll
-  const getPollData = (id, unique, allFields) => {
-    const retOptions = [];
-    const selected = [];
-    let options = null;
-    let poll = null;
-    return query('SELECT topic, locked, one_vote_per_ip, lock_changing, multiple_votes, public, allow_editing FROM polls WHERE id = ?', [id], true)
-      .then((row) => {
-        if (row) {
-          poll = row;
-          return query('SELECT id, name FROM options WHERE poll_id = ? ORDER BY position ASC', [id]);
-        } else {
-          return Promise.reject(REJECTION_REASONS.existence);
-        }
-      }).then((rows) => {
-        const promises = rows.map((option) => query('SELECT COUNT(*) FROM votes WHERE option_id = ?', [option.id]));
-        options = rows;
-        return Promise.all(promises);
-      }).then((values) => {
-        values.forEach((value, index) => {
-          const { id } = options[index];
-          retOptions.push({
-            id,
-            name: options[index].name,
-            votes: value[0]['COUNT(*)']
-          });
-        });
-
-        if (unique) {
-          return query(`SELECT option_id FROM votes WHERE ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [CLIENT_IP, CLIENT_ID]);
-        } else {
-          return Promise.resolve();
-        }
-      }).then((votes) => {
-        if (votes) {
-          votes.forEach((vote) => {
-            const option = retOptions.find((option) => option.id === vote.option_id);
-            if (option) {
-              selected.push(option.id);
-            }
-          });
-        }
-
-        const obj = {
-          topic: poll.topic,
-          locked: !!poll.locked,
-          lock_changing: !!poll.lock_changing,
-          multiple_votes: !!poll.multiple_votes,
-          public: !!poll.public,
-          allow_editing: !!poll.allow_editing,
-          options: retOptions.map((option) => Object.assign(option, {
-            max: option.votes + QUERY_LIMIT
-          })),
-          selected: unique ? selected : null
-        };
-
-        if (allFields) {
-          obj.one_vote_per_ip = !!poll.one_vote_per_ip;
-        }
-
-        return obj;
-      });
-  };
-
   const sendPublicPolls = (target) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC')
     .then((publicPolls) => sendFrame(target, 'public polls', publicPolls));
 
@@ -333,21 +373,27 @@ io.on('connection', (socket) => {
         const topic = data.topic.trim();
         data.options.forEach((option, index) => option.name = option.name.trim());
         const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
+        let unlockAt = new Date(data.unlock_at);
+        // set time to 12 am
+        ['Hour', 'Minute', 'Second'].forEach((unit) => unlockAt[`set${unit}s`](0));
+        unlockAt = +unlockAt;
         // match client-side validation
-        if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing) && (!data.lock_changing || !data.multiple_votes)) {
+        if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing) && (!data.lock_changing || !data.multiple_votes) &&
+          ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
           query('INSERT INTO polls SET ?', {
             id,
             created_at: Date.now(),
             updated_at: Date.now(),
             ip_address: CLIENT_IP,
             topic: emojiStrip(topic),
-            locked: 0,
+            locked: data.unlock_at ? 1 : 0,
             one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             lock_changing: data.lock_changing ? 1 : 0,
             multiple_votes: data.multiple_votes ? 1 : 0,
             public: data.public ? 1 : 0,
             allow_editing: data.allow_editing ? 1 : 0,
-            edit_password: passwordHash.generate(data.edit_password || uuidv4())
+            edit_password: passwordHash.generate(data.edit_password || uuidv4()),
+            unlock_at: data.unlock_at ? unlockAt : null
           }).then(() => Promise.all(options.map((option, position) => query('INSERT INTO options SET ?', {
             id: uuidv4(),
             created_at: Date.now(),
@@ -360,6 +406,10 @@ io.on('connection', (socket) => {
           })).then(() => {
             if (data.public) {
               sendPublicPolls('everyone');
+            }
+
+            if (data.unlock_at) {
+              schedulePollUnlock(id, unlockAt);
             }
           });
         } else {
@@ -415,13 +465,20 @@ io.on('connection', (socket) => {
         const topic = data.topic.trim();
         data.options.forEach((option, index) => option.name = option.name.trim());
         const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
-        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && topic && options.length >= 2 && (!data.lock_changing || !data.multiple_votes)) {
+        let unlockAt = new Date(data.unlock_at);
+        // set time to 12 am
+        ['Hour', 'Minute', 'Second'].forEach((unit) => unlockAt[`set${unit}s`](0));
+        unlockAt = +unlockAt;
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && topic && options.length >= 2 && (!data.lock_changing || !data.multiple_votes) &&
+          ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
           const dbData = {
             updated_at: Date.now(),
             topic: emojiStrip(topic),
+            locked: data.unlock_at ? 1 : 0,
             lock_changing: data.lock_changing ? 1 : 0,
             multiple_votes: data.multiple_votes ? 1 : 0,
-            public: data.public ? 1 : 0
+            public: data.public ? 1 : 0,
+            unlock_at: data.unlock_at ? unlockAt : null
           };
           // only allow admins to change certain props
           if (AUTHENTICATED[SOCKET_ID].admin) {
@@ -497,6 +554,10 @@ io.on('connection', (socket) => {
             })
             .then(() => getPollData(data.id))
             .then((pollData) => {
+              cancelPollUnlock(data.id);
+              if (data.unlock_at) {
+                schedulePollUnlock(data.id, unlockAt);
+              }
               // announce
               sendFrame(data.id, 'poll data', pollData);
               sendPublicPolls('everyone');
