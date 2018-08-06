@@ -64,10 +64,6 @@ export default Ember.Controller.extend({
   },
 
   actions: {
-    updateUnlockAt(dateTime) {
-      this.set('unlockAt', +dateTime);
-    },
-
     submitPassword() {
       return this.get('socket').authenticatePoll(this.get('pollId'), this.get('password')).then((data) => {
         const lockVoting = data.unlock_at && new Date(data.unlock_at) > new Date();
