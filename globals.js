@@ -37,4 +37,4 @@ module.exports.REJECTION_REASONS = {
 };
 
 module.exports.HANDSHAKE_WAIT_TIME = 10000;
-module.exports.MAXIMUM_UNLOCK_AT = Date.now() + 1728000000 // 20 days from now;
+module.exports.MAXIMUM_UNLOCK_AT = Date.now() + 1728000000; // 20 days from now
