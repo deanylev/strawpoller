@@ -18,9 +18,6 @@ export default Ember.Controller.extend({
     return options;
   }),
 
-  handleData: null,
-  join: null,
-
   inFlight: false,
 
   disabled: Ember.computed('inFlight', 'socket.disconnected', 'locked', 'lockChanging', 'selected', function() {
@@ -40,6 +37,11 @@ export default Ember.Controller.extend({
     this._super(...arguments);
 
     this.setDefaults();
+    this.get('socket').registerListener('poll data', (data) => this.handleData(data));
+    // don't call join on the initial handshake
+    this.get('socket').registerOnce('handshake', () => {
+      this.get('socket').registerListener('handshake', () => this.join());
+    });
   },
 
   setDefaults() {
@@ -49,49 +51,34 @@ export default Ember.Controller.extend({
     });
   },
 
-  subscribe(pollId) {
-    this.set('pollId', pollId);
-    this.set('handleData', (data) => {
-      this.setProperties({
-        topic: data.topic,
-        locked: data.locked,
-        lockChanging: data.lock_changing,
-        allowEditing: data.allow_editing,
-        unlockAt: data.unlock_at,
-        options: data.options
-      });
-      if (data.selected) {
-        this.set('selected', data.selected);
-      }
+  handleData(data) {
+    this.setProperties({
+      topic: data.topic,
+      locked: data.locked,
+      lockChanging: data.lock_changing,
+      allowEditing: data.allow_editing,
+      unlockAt: data.unlock_at,
+      options: data.options
     });
-
-    this.set('join', () => {
-      this.get('socket').joinPoll(pollId)
-        .then(this.handleData)
-        .catch((err) => {
-          this.set('topic', err.reason);
-          this.set('locked', false);
-          this.set('allowEditing', false);
-          this.set('options', []);
-        })
-        .finally(() => this.set('initialLoad', true))
-    });
-
-    this.join();
-
-    this.get('socket').registerListener('poll data', this.handleData);
-    // don't call join on the initial handshake
-    this.get('socket').registerOnce('handshake', () => {
-      this.get('socket').registerListener('handshake', this.join);
-    });
+    if (data.selected) {
+      this.set('selected', data.selected);
+    }
   },
 
-  unsubscribe() {
-    this.setDefaults();
+  join() {
+    this.get('socket').joinPoll(this.get('pollId'))
+      .then((data) => this.handleData(data))
+      .catch((err) => {
+        this.set('topic', err.reason);
+        this.set('locked', false);
+        this.set('allowEditing', false);
+        this.set('options', []);
+      })
+      .finally(() => this.set('initialLoad', true));
+  },
 
-    // remove listeners
-    this.get('socket').unregisterListener('poll data', this.handleData);
-    this.get('socket').unregisterListener('handshake', this.join);
+  leave() {
+    this.setDefaults();
 
     // unsubscribe from the room
     this.get('socket').leavePoll(this.get('pollId'));

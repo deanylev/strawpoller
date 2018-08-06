@@ -8,10 +8,11 @@ export default Ember.Route.extend({
   },
 
   setupController(controller, model) {
-    controller.subscribe(model.pollId);
+    controller.set('pollId', model.pollId);
+    controller.join();
   },
 
   resetController(controller) {
-    controller.unsubscribe();
+    controller.leave();
   }
 });
