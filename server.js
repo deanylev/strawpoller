@@ -611,6 +611,12 @@ io.on('connection', (socket) => {
         let poll = null;
         query('SELECT locked, one_vote_per_ip, lock_changing, multiple_votes FROM polls WHERE id = ?', [pollId], true).then((row) => {
           poll = row;
+          if (!poll) {
+            respond(false, {
+              reason: REJECTION_REASONS.existence
+            });
+            return Promise.reject();
+          }
           if (poll.locked) {
             respond(false, {
               reason: REJECTION_REASONS.auth
