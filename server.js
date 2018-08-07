@@ -591,6 +591,7 @@ io.on('connection', (socket) => {
             .then(() => query('DELETE FROM options WHERE poll_id = ?', [data.id]))
             .then(() => query('DELETE FROM votes WHERE poll_id = ?', [data.id]))
             .then(() => {
+              cancelPollUnlock(data.id);
               sendPublicPolls('everyone');
               // send fake poll data
               sendFrame(data.id, 'poll data', {
