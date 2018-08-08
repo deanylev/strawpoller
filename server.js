@@ -469,103 +469,109 @@ io.on('connection', (socket) => {
         // set time to 12 am
         ['Hour', 'Minute', 'Second'].forEach((unit) => unlockAt[`set${unit}s`](0));
         unlockAt = +unlockAt;
-        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id && topic && options.length >= 2 && (!data.lock_changing || !data.multiple_votes) &&
-          ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
-          const dbData = {
-            updated_at: Date.now(),
-            topic: emojiStrip(topic),
-            locked: data.unlock_at ? 1 : 0,
-            lock_changing: data.lock_changing ? 1 : 0,
-            multiple_votes: data.multiple_votes ? 1 : 0,
-            public: data.public ? 1 : 0,
-            unlock_at: data.unlock_at ? unlockAt : null
-          };
-          // only allow admins to change certain props
-          if (AUTHENTICATED[SOCKET_ID].admin) {
-            dbData.one_vote_per_ip = data.one_vote_per_ip ? 1 : 0;
-            dbData.allow_editing = data.allow_editing ? 1 : 0;
-          }
-          if (data.edit_password) {
-            dbData.edit_password = passwordHash.generate(data.edit_password);
-          }
-          let currentOptions = null;
-          let newOptions = null;
-          query('SELECT id FROM options WHERE poll_id = ?', [data.id])
-            .then((results) => {
-              currentOptions = options.filter((o1) => results.find((o2) => o2.id === o1.id));
-              newOptions = options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
-              return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
-            })
-            // delete options from before that have been removed
-            .then(() => {
-              if (data.removed_options.length) {
-                return Promise.all([
-                  query('DELETE FROM options WHERE poll_id = ? AND id IN (?)', [data.id, data.removed_options]),
-                  query('DELETE FROM votes WHERE poll_id = ? AND option_id IN (?)', [data.id, data.removed_options])
-                ]);
-              } else {
-                return Promise.resolve();
-              }
-            })
-            // change names of options from before
-            .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE poll_id = ? AND id = ?', [{
+        if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
+          if (topic && options.length >= 2 && (!data.lock_changing || !data.multiple_votes) &&
+            ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
+            const dbData = {
               updated_at: Date.now(),
-              position: option.position,
-              name: emojiStrip(option.name)
-            }, data.id, option.id]))))
-            // add new options
-            .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
-              id: uuidv4(),
-              created_at: Date.now(),
-              updated_at: Date.now(),
-              poll_id: data.id,
-              position: option.position,
-              name: emojiStrip(option.name)
-            }, option.id]))))
-            .then(() => {
-              // only allow admins to insert fake votes
-              if (AUTHENTICATED[SOCKET_ID].admin) {
-                let remainingQueries = QUERY_LIMIT;
-                const promises = [];
-                return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE poll_id = ? AND option_id = ?', [data.id, option.id], true)
-                  .then((result) => {
-                    const voteCount = result['COUNT(*)'];
-                    // the new vote count is higher than the current count, votes need to be added to the db
-                    if (option.votes > voteCount) {
-                      for (let i = 0; i < Math.min(option.votes - voteCount, remainingQueries); i++) {
-                        promises.push(query('INSERT INTO votes SET ?', {
-                          id: uuidv4(),
-                          created_at: Date.now(),
-                          poll_id: data.id,
-                          option_id: option.id,
-                          client_id: 'ADMIN',
-                          ip_address: 'ADMIN'
-                        }));
+              topic: emojiStrip(topic),
+              locked: data.unlock_at ? 1 : 0,
+              lock_changing: data.lock_changing ? 1 : 0,
+              multiple_votes: data.multiple_votes ? 1 : 0,
+              public: data.public ? 1 : 0,
+              unlock_at: data.unlock_at ? unlockAt : null
+            };
+            // only allow admins to change certain props
+            if (AUTHENTICATED[SOCKET_ID].admin) {
+              dbData.one_vote_per_ip = data.one_vote_per_ip ? 1 : 0;
+              dbData.allow_editing = data.allow_editing ? 1 : 0;
+            }
+            if (data.edit_password) {
+              dbData.edit_password = passwordHash.generate(data.edit_password);
+            }
+            let currentOptions = null;
+            let newOptions = null;
+            query('SELECT id FROM options WHERE poll_id = ?', [data.id])
+              .then((results) => {
+                currentOptions = options.filter((o1) => results.find((o2) => o2.id === o1.id));
+                newOptions = options.filter((o1) => !currentOptions.find((o2) => o2.id === o1.id));
+                return query('UPDATE polls SET ? WHERE id = ?', [dbData, data.id]);
+              })
+              // delete options from before that have been removed
+              .then(() => {
+                if (data.removed_options.length) {
+                  return Promise.all([
+                    query('DELETE FROM options WHERE poll_id = ? AND id IN (?)', [data.id, data.removed_options]),
+                    query('DELETE FROM votes WHERE poll_id = ? AND option_id IN (?)', [data.id, data.removed_options])
+                  ]);
+                } else {
+                  return Promise.resolve();
+                }
+              })
+              // change names of options from before
+              .then(() => Promise.all(currentOptions.map((option) => query('UPDATE options SET ? WHERE poll_id = ? AND id = ?', [{
+                updated_at: Date.now(),
+                position: option.position,
+                name: emojiStrip(option.name)
+              }, data.id, option.id]))))
+              // add new options
+              .then(() => Promise.all(newOptions.map((option) => query('INSERT INTO options SET ?', [{
+                id: uuidv4(),
+                created_at: Date.now(),
+                updated_at: Date.now(),
+                poll_id: data.id,
+                position: option.position,
+                name: emojiStrip(option.name)
+              }, option.id]))))
+              .then(() => {
+                // only allow admins to insert fake votes
+                if (AUTHENTICATED[SOCKET_ID].admin) {
+                  let remainingQueries = QUERY_LIMIT;
+                  const promises = [];
+                  return Promise.all(currentOptions.map((option) => query('SELECT COUNT(*) FROM votes WHERE poll_id = ? AND option_id = ?', [data.id, option.id], true)
+                    .then((result) => {
+                      const voteCount = result['COUNT(*)'];
+                      // the new vote count is higher than the current count, votes need to be added to the db
+                      if (option.votes > voteCount) {
+                        for (let i = 0; i < Math.min(option.votes - voteCount, remainingQueries); i++) {
+                          promises.push(query('INSERT INTO votes SET ?', {
+                            id: uuidv4(),
+                            created_at: Date.now(),
+                            poll_id: data.id,
+                            option_id: option.id,
+                            client_id: 'ADMIN',
+                            ip_address: 'ADMIN'
+                          }));
+                        }
+                        remainingQueries -= option.votes - voteCount;
+                      } else {
+                        // otherwise, votes need to be deleted from the db
+                        promises.push(query('DELETE FROM votes WHERE poll_id = ? AND option_id = ? LIMIT ?', [data.id, option.id, voteCount - option.votes]));
                       }
-                      remainingQueries -= option.votes - voteCount;
-                    } else {
-                      // otherwise, votes need to be deleted from the db
-                      promises.push(query('DELETE FROM votes WHERE poll_id = ? AND option_id = ? LIMIT ?', [data.id, option.id, voteCount - option.votes]));
-                    }
-                  }))).then(() => Promise.all(promises));
-              } else {
-                return Promise.resolve();
-              }
-            })
-            .then(() => getPollData(data.id))
-            .then((pollData) => {
-              cancelPollUnlock(data.id);
-              if (data.unlock_at) {
-                schedulePollUnlock(data.id, unlockAt);
-              }
-              // announce
-              sendFrame(data.id, 'poll data', pollData);
-              sendPublicPolls('everyone');
-              respond(true);
+                    }))).then(() => Promise.all(promises));
+                } else {
+                  return Promise.resolve();
+                }
+              })
+              .then(() => getPollData(data.id))
+              .then((pollData) => {
+                cancelPollUnlock(data.id);
+                if (data.unlock_at) {
+                  schedulePollUnlock(data.id, unlockAt);
+                }
+                // announce
+                sendFrame(data.id, 'poll data', pollData);
+                sendPublicPolls('everyone');
+                respond(true);
+              });
+          } else {
+            respond(false, {
+              reason: REJECTION_REASONS.params
             });
+          }
         } else {
           respond(false, {
-            reason: REJECTION_REASONS.params
+            reason: REJECTION_REASONS.auth
           });
         }
       });
