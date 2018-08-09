@@ -1,9 +1,8 @@
-/* global io, Fingerprint2 */
-
 import Ember from 'ember';
 import config from '../config/environment';
-
-const DEFAULT_LISTENERS = ['connect', 'disconnect'];
+import io from 'npm:socket.io-client';
+import ioWildcard from 'npm:socketio-wildcard';
+import Fingerprint2 from 'npm:fingerprintjs2';
 
 export default Ember.Service.extend({
   logger: Ember.inject.service(),
@@ -27,7 +26,18 @@ export default Ember.Service.extend({
   init() {
     this._super(...arguments);
 
-    this.set('socket', io(config.APP.SOCKET_HOST));
+    const socket = io(config.APP.SOCKET_HOST);
+    ioWildcard(io.Manager)(socket);
+    this.set('socket', socket);
+
+    this.get('socket').on('*', (packet) => {
+      const name = packet.data[0];
+      const data = typeof packet.data[1] === 'object' && packet.data[1] !== null ? packet.data[1] : {};
+      this.get('logger').log('socket', 'received frame', {
+        name,
+        data
+      });
+    });
 
     this.registerListener('connect', () => this.set('connected', true));
     this.registerListener('disconnect', () => this.set('connected', false));
@@ -76,15 +86,7 @@ export default Ember.Service.extend({
   },
 
   registerListener(name, callback) {
-    this.get('socket').on(name, (data) => {
-      if (!DEFAULT_LISTENERS.includes(name)) {
-        this.get('logger').log('socket', 'received frame', {
-          name,
-          data: data || {}
-        });
-      }
-      callback(data);
-    });
+    this.get('socket').on(name, callback);
   },
 
   unregisterListener(name, callback) {
@@ -92,15 +94,7 @@ export default Ember.Service.extend({
   },
 
   registerOnce(name, callback) {
-    this.get('socket').once(name, (data) => {
-      if (!DEFAULT_LISTENERS.includes(name)) {
-        this.get('logger').log('socket', 'received frame', {
-          name,
-          data: data || {}
-        });
-      }
-      callback(data);
-    });
+    this.get('socket').once(name, callback);
   },
 
   handshake(clientId) {

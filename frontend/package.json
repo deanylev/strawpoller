@@ -54,5 +54,10 @@
   "engines": {
     "node": "^4.5 || 6.* || >= 7.*"
   },
-  "dependencies": {}
+  "dependencies": {
+    "ember-browserify": "^1.2.2",
+    "fingerprintjs2": "^1.8.1",
+    "socket.io-client": "^2.1.1",
+    "socketio-wildcard": "^2.0.0"
+  }
 }
