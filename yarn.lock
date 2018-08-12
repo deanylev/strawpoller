@@ -516,6 +516,12 @@ setprototypeof@1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.1.0.tgz#d0bd85536887b6fe7c0d818cb962d9d91c54e656"
 
+skrt-logger@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/skrt-logger/-/skrt-logger-1.0.4.tgz#ce5e063ef0bfc4baced34ac3be0295a176fd06cf"
+  dependencies:
+    chalk "^2.4.1"
+
 socket.io-adapter@~1.1.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/socket.io-adapter/-/socket.io-adapter-1.1.1.tgz#2a805e8a14d6372124dd9159ad4502f8cb07f06b"

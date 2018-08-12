@@ -1,5 +1,5 @@
 // our libraries
-const Logger = require('./logger');
+const SkrtLogger = require('skrt-logger');
 
 // third party libraries
 const express = require('express');
@@ -21,7 +21,7 @@ const {
 } = require('./globals');
 
 // config
-const logger = new Logger();
+const logger = new SkrtLogger();
 const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
@@ -303,7 +303,7 @@ io.on('connection', (socket) => {
           socketId: SOCKET_ID,
           name,
           data,
-          error: error.stack
+          error
         });
 
         ack(false);
