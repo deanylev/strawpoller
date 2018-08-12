@@ -8,7 +8,7 @@
     {{#each displayedOptions as |option|}}
       {{#spin-button class=(concat "btn btn-block btn-" (if option.selected "success" "dark")) buttonStyle="zoom-out" disabled=disabled action=(action "vote" option)}}
         <h5>{{option.name}}</h5>
-        <p>{{option.votes}} votes</p>
+        <p>{{option.votes}} {{if (eq option.votes 1) "vote" "votes"}}</p>
       {{/spin-button}}
     {{/each}}
   {{/if}}
