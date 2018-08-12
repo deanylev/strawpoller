@@ -200,6 +200,7 @@ const getPollData = (id, unique, allFields) => {
       }
 
       const obj = {
+        id,
         topic: poll.topic,
         locked: !!poll.locked,
         lock_changing: !!poll.lock_changing,

@@ -52,16 +52,18 @@ export default Ember.Controller.extend({
   },
 
   handleData(data) {
-    this.setProperties({
-      topic: data.topic,
-      locked: data.locked,
-      lockChanging: data.lock_changing,
-      allowEditing: data.allow_editing,
-      unlockAt: data.unlock_at,
-      options: data.options
-    });
-    if (data.selected) {
-      this.set('selected', data.selected);
+    if (data.id === this.get('pollId')) {
+      this.setProperties({
+        topic: data.topic,
+        locked: data.locked,
+        lockChanging: data.lock_changing,
+        allowEditing: data.allow_editing,
+        unlockAt: data.unlock_at,
+        options: data.options
+      });
+      if (data.selected) {
+        this.set('selected', data.selected);
+      }
     }
   },
 
