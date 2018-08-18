@@ -9,7 +9,7 @@ export default Ember.Controller.extend({
 
   center: ONE_DAY_FROM_NOW,
   minDate: new Date(),
-  maxDate: new Date(Date.now() + 20 * ONE_DAY),
+  maxDate: new Date(Date.now() + 19 * ONE_DAY),
 
   disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank

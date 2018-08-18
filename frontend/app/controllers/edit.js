@@ -9,7 +9,7 @@ export default Ember.Controller.extend({
 
   center: null,
   minDate: new Date(),
-  maxDate: new Date(Date.now() + 20 * ONE_DAY),
+  maxDate: new Date(Date.now() + 19 * ONE_DAY),
 
   admin: false,
 
@@ -36,7 +36,7 @@ export default Ember.Controller.extend({
     && this.get('socket.connected'));
   }),
 
-  filteredOptions: Ember.computed('options.[]', 'options.@each.name', 'newOptions.[]', 'newOptions.@each.name', function() {
+  filteredOptions: Ember.computed('options.[]', 'options.@each.name', 'options.@each.votes', 'newOptions.[]', 'newOptions.@each.name', function() {
     const options = Ember.copy(this.get('options'), true).concat(Ember.copy(this.get('newOptions'), true));
     options.forEach((option) => option.name = option.name.trim());
     return options.filter((option) => option.name);
