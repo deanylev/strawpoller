@@ -22,7 +22,8 @@ const {
   REJECTION_REASONS,
   MAXIMUM_UNLOCK_AT,
   ENABLE_API,
-  DEBOUNCE_INTERVAL
+  DEBOUNCE_INTERVAL,
+  DEBOUNCE_VIOLATION_THRESHOLD
 } = require('./globals');
 
 // config
@@ -362,8 +363,12 @@ io.on('connection', (socket) => {
           ack,
           reason: REJECTION_REASONS.debounced
         });
-        client.debouncedAt = Date.now();
         ack(false);
+        if (DEBOUNCE_VIOLATION_THRESHOLD && ++client.debounceViolations >= DEBOUNCE_VIOLATION_THRESHOLD) {
+          kickClient('debounce violation threshold crossed');
+        } else {
+          client.debouncedAt = Date.now();
+        }
         return; 
       }
 
@@ -457,7 +462,8 @@ io.on('connection', (socket) => {
       CLIENTS.push({
         id: CLIENT_ID,
         socketId: SOCKET_ID,
-        debouncedAt: 0
+        debouncedAt: 0,
+        debounceViolations: 0
       });
 
       registerListener('create poll', (data, respond) => {
