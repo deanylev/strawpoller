@@ -1,7 +1,8 @@
 const CONFIG_VARS = {
   PORT: 8080,
   QUERY_LIMIT: 1000,
-  MASTER_PASS: null
+  MASTER_PASS: null,
+  ENABLE_API: false
 };
 
 Object.keys(CONFIG_VARS).forEach((configVar) => module.exports[configVar] = process.env[configVar] || CONFIG_VARS[configVar]);

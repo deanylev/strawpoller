@@ -8,6 +8,9 @@ const mysql = require('mysql');
 const emojiStrip = require('emoji-strip');
 const passwordHash = require('password-hash');
 const ioWildcard = require('socketio-wildcard');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const _ = require('lodash');
 
 // constants
 const {
@@ -17,7 +20,8 @@ const {
   DB_CREDS,
   HANDSHAKE_WAIT_TIME,
   REJECTION_REASONS,
-  MAXIMUM_UNLOCK_AT
+  MAXIMUM_UNLOCK_AT,
+  ENABLE_API
 } = require('./globals');
 
 // config
@@ -47,6 +51,16 @@ const query = (query, values, singleRow) => {
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
+
+app.use((req, res, next) => {
+  logger.log('router', 'request',  Object.assign(_.pick(req, 'method', 'url', 'body'), {
+    ip: req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.connection.remoteAddress
+  }));
+  next();
+});
 
 // actual logic
 
@@ -147,7 +161,9 @@ createTable('votes', [
   }
 ], false);
 
-http.listen(PORT, () => logger.log('server', 'listening on port', PORT));
+http.listen(PORT, () => logger.log('server', 'started listening', {
+  port: PORT
+}));
 
 // keeps track of what polls are authenticated for editing to which users
 const AUTHENTICATED = {};
@@ -208,11 +224,14 @@ const getPollData = (id, unique, allFields) => {
         public: !!poll.public,
         allow_editing: !!poll.allow_editing,
         unlock_at: poll.unlock_at,
-        options: retOptions.map((option) => Object.assign(option, {
+        options: allFields ? retOptions.map((option) => Object.assign(option, {
           max: option.votes + QUERY_LIMIT
-        })),
-        selected: unique ? selected : null
+        })) : retOptions
       };
+
+      if (unique) {
+        obj.selected = selected;
+      }
 
       if (allFields) {
         obj.one_vote_per_ip = !!poll.one_vote_per_ip;
@@ -220,6 +239,48 @@ const getPollData = (id, unique, allFields) => {
 
       return obj;
     });
+};
+const createPoll = (data, ipAddress) => {
+  const id = uuidv4();
+  const topic = emojiStrip(data.topic.trim());
+  data.options = data.options || [];
+  data.options.forEach((option, index) => option.name = option.name.trim());
+  const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
+  let unlockAt = new Date(data.unlock_at);
+  // set time to 12 am
+  ['Hour', 'Minute', 'Second'].forEach((unit) => unlockAt[`set${unit}s`](0));
+  unlockAt = +unlockAt;
+  // match client-side validation
+  if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing) && (!data.lock_changing || !data.multiple_votes) &&
+    ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || !data.unlock_at)) {
+    return query('INSERT INTO polls SET ?', {
+      id,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      ip_address: CLIENT_IP || ipAddress,
+      topic,
+      locked: data.unlock_at ? 1 : 0,
+      one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
+      lock_changing: data.lock_changing ? 1 : 0,
+      multiple_votes: data.multiple_votes ? 1 : 0,
+      public: data.public ? 1 : 0,
+      allow_editing: data.allow_editing ? 1 : 0,
+      edit_password: passwordHash.generate(data.edit_password || uuidv4()),
+      unlock_at: data.unlock_at ? unlockAt : null
+    }).then(() => Promise.all(options.map((option, position) => query('INSERT INTO options SET ?', {
+      id: uuidv4(),
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      poll_id: id,
+      position,
+      name: emojiStrip(option.name)
+    })))).then(() => ({
+      id,
+      unlockAt
+    }));
+  } else {
+    return Promise.reject();
+  }
 };
 
 const schedulePollUnlock = (id, at) => {
@@ -370,54 +431,23 @@ io.on('connection', (socket) => {
       sendPublicPolls(SOCKET_ID);
 
       registerListener('create poll', (data, respond) => {
-        const id = uuidv4();
-        const topic = emojiStrip(data.topic.trim());
-        data.options.forEach((option, index) => option.name = option.name.trim());
-        const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
-        let unlockAt = new Date(data.unlock_at);
-        // set time to 12 am
-        ['Hour', 'Minute', 'Second'].forEach((unit) => unlockAt[`set${unit}s`](0));
-        unlockAt = +unlockAt;
-        // match client-side validation
-        if (topic && options.length >= 2 && (data.edit_password || !data.allow_editing) && (!data.lock_changing || !data.multiple_votes) &&
-          ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
-          query('INSERT INTO polls SET ?', {
-            id,
-            created_at: Date.now(),
-            updated_at: Date.now(),
-            ip_address: CLIENT_IP,
-            topic,
-            locked: data.unlock_at ? 1 : 0,
-            one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
-            lock_changing: data.lock_changing ? 1 : 0,
-            multiple_votes: data.multiple_votes ? 1 : 0,
-            public: data.public ? 1 : 0,
-            allow_editing: data.allow_editing ? 1 : 0,
-            edit_password: passwordHash.generate(data.edit_password || uuidv4()),
-            unlock_at: data.unlock_at ? unlockAt : null
-          }).then(() => Promise.all(options.map((option, position) => query('INSERT INTO options SET ?', {
-            id: uuidv4(),
-            created_at: Date.now(),
-            updated_at: Date.now(),
-            poll_id: id,
-            position,
-            name: emojiStrip(option.name)
-          })))).then(() => respond(true, {
-            id
-          })).then(() => {
+        createPoll(data)
+          .then((poll) => {
+            respond(true, {
+              id: poll.id
+            });
+
             if (data.public) {
               sendPublicPolls('everyone');
             }
-
+  
             if (data.unlock_at) {
-              schedulePollUnlock(id, unlockAt);
+              schedulePollUnlock(poll.id, poll.unlockAt);
             }
-          });
-        } else {
-          respond(false, {
+          })
+          .catch(() => respond(false, {
             reason: REJECTION_REASONS.params
-          });
-        }
+          }));
       });
 
       registerListener('join poll', (data, respond) => {
@@ -472,7 +502,7 @@ io.on('connection', (socket) => {
         unlockAt = +unlockAt;
         if (AUTHENTICATED[SOCKET_ID] && AUTHENTICATED[SOCKET_ID].id === data.id) {
           if (topic && options.length >= 2 && (!data.lock_changing || !data.multiple_votes) &&
-            ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
+            ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || !data.unlock_at)) {
             const dbData = {
               updated_at: Date.now(),
               topic,
@@ -701,4 +731,25 @@ io.on('connection', (socket) => {
   }, true);
 });
 
+// public routes
+
 app.get('/', (req, res) => res.render('pages/index'));
+
+if (ENABLE_API) {
+  const apiV1 = express.Router();
+  apiV1.all('*', cors());
+  app.use('/api/v1', apiV1);
+  
+  apiV1.get('/polls/:id', (req, res) => {
+    getPollData(req.params.id)
+      .then((pollData) => res.json(pollData))
+      .catch(() => res.sendStatus(404));
+  });
+  
+  apiV1.post('/polls', (req, res) => {
+    createPoll(req.body, getIp(req))
+      .then((poll) => getPollData(poll.id))
+      .then((pollData) => res.json(pollData))
+      .catch(() => res.sendStatus(400));
+  });
+}
