@@ -371,7 +371,7 @@ io.on('connection', (socket) => {
 
       registerListener('create poll', (data, respond) => {
         const id = uuidv4();
-        const topic = data.topic.trim();
+        const topic = emojiStrip(data.topic.trim());
         data.options.forEach((option, index) => option.name = option.name.trim());
         const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
         let unlockAt = new Date(data.unlock_at);
@@ -386,7 +386,7 @@ io.on('connection', (socket) => {
             created_at: Date.now(),
             updated_at: Date.now(),
             ip_address: CLIENT_IP,
-            topic: emojiStrip(topic),
+            topic,
             locked: data.unlock_at ? 1 : 0,
             one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
             lock_changing: data.lock_changing ? 1 : 0,
@@ -463,7 +463,7 @@ io.on('connection', (socket) => {
 
       registerListener('save poll', (data, respond) => {
         // match client-side validation
-        const topic = data.topic.trim();
+        const topic = emojiStrip(data.topic.trim());
         data.options.forEach((option, index) => option.name = option.name.trim());
         const options = data.options.filter((o1, i, arr) => o1.name && arr.map((o2) => o2.name).indexOf(o1.name) === i);
         let unlockAt = new Date(data.unlock_at);
@@ -475,7 +475,7 @@ io.on('connection', (socket) => {
             ((typeof data.unlock_at === 'number' && data.unlock_at >= Date.now() && data.unlock_at <= MAXIMUM_UNLOCK_AT) || data.unlock_at === null)) {
             const dbData = {
               updated_at: Date.now(),
-              topic: emojiStrip(topic),
+              topic,
               locked: data.unlock_at ? 1 : 0,
               lock_changing: data.lock_changing ? 1 : 0,
               multiple_votes: data.multiple_votes ? 1 : 0,
