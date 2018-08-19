@@ -1,8 +1,9 @@
 const CONFIG_VARS = {
   PORT: 8080,
   QUERY_LIMIT: 1000,
-  MASTER_PASS: null,
-  ENABLE_API: false
+  DEBOUNCE_INTERVAL: 300,
+  ENABLE_API: false,
+  MASTER_PASS: null
 };
 
 Object.keys(CONFIG_VARS).forEach((configVar) => module.exports[configVar] = process.env[configVar] || CONFIG_VARS[configVar]);
@@ -34,7 +35,8 @@ module.exports.REJECTION_REASONS = {
   existence: 'Poll not found.',
   auth: 'Unauthorised.',
   password: 'Password incorrect.',
-  listener: 'No listener.'
+  listener: 'No listener.',
+  debounced: 'Client debounced.'
 };
 
 module.exports.HANDSHAKE_WAIT_TIME = 10000;

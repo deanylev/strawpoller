@@ -21,7 +21,8 @@ const {
   HANDSHAKE_WAIT_TIME,
   REJECTION_REASONS,
   MAXIMUM_UNLOCK_AT,
-  ENABLE_API
+  ENABLE_API,
+  DEBOUNCE_INTERVAL
 } = require('./globals');
 
 // config
@@ -169,6 +170,8 @@ http.listen(PORT, () => logger.log('server', 'started listening', {
 const AUTHENTICATED = {};
 // keeps track of timeouts to unlock polls
 const TIMEOUTS = {};
+// keeps track of connected clients
+let CLIENTS = [];
 
 let CLIENT_IP = null;
 let CLIENT_ID = null;
@@ -318,6 +321,7 @@ io.on('connection', (socket) => {
   // Cloudflare messes with the connecting IP
   CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const SOCKET_ID = socket.id;
+  const CLIENT = null;
   const sendFrame = (target, name, data) => {
     logger.log('socket', 'sending frame', {
       target,
@@ -336,6 +340,7 @@ io.on('connection', (socket) => {
   const registerListener = (name, callback, once) => {
     LISTENERS.add(name);
     socket[once ? 'once' : 'on'](name, (data = {}, ack) => {
+      const client = name === 'handshake' ? {} : CLIENTS.find((client) => client.id === CLIENT_ID);
       if (once) {
         LISTENERS.delete(name);
       }
@@ -349,6 +354,20 @@ io.on('connection', (socket) => {
         });
         return;
       }
+      if (Date.now() - client.debouncedAt < DEBOUNCE_INTERVAL) {
+        logger.warn('socket', 'dropping frame', {
+          socketId: SOCKET_ID,
+          name,
+          data,
+          ack,
+          reason: REJECTION_REASONS.debounced
+        });
+        client.debouncedAt = Date.now();
+        ack(false);
+        return; 
+      }
+
+      client.debouncedAt = Date.now();
 
       try {
         callback(data, (success, data) => {
@@ -388,10 +407,14 @@ io.on('connection', (socket) => {
     ip: CLIENT_IP
   });
 
-  socket.on('disconnect', () => logger.log('socket', 'client disconnected', {
-    id: SOCKET_ID,
-    ip: CLIENT_IP
-  }));
+  socket.on('disconnect', () => {
+    logger.log('socket', 'client disconnected', {
+      id: SOCKET_ID,
+      ip: CLIENT_IP
+    });
+
+    CLIENTS = CLIENTS.filter((client) => client.socketId !== SOCKET_ID);
+  });
 
   socket.on('*', (packet) => {
     const name = packet.data[0];
@@ -429,6 +452,13 @@ io.on('connection', (socket) => {
       sendFrame(SOCKET_ID, 'handshake');
       respond(true);
       sendPublicPolls(SOCKET_ID);
+
+
+      CLIENTS.push({
+        id: CLIENT_ID,
+        socketId: SOCKET_ID,
+        debouncedAt: 0
+      });
 
       registerListener('create poll', (data, respond) => {
         createPoll(data)
