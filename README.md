@@ -41,3 +41,9 @@ Run `/build_frontend.sh`. It will build the frontend and move the generated file
 `MASTER_PASS` - An optional 'master password' to access editing for any poll, whether editing is set to allowed or not. Also grants special admin permissions when editing a poll. (default null)
 
 `QUERY_LIMIT` - The max number of queries allowed to be run in a single function. (default 1000)
+
+`ENABLE_API` - Whether to enable the undocumented public API. (default false)
+
+`DEBOUNCE_INTERVAL` - The number of milliseconds that have to pass before a new request can be made by the client over the socket. If a request is made before this interval has passed, the timer gets reset back to this interval, and a debounce violation is recorded against the client. This is to prevent exploiting the database-heavy nature of requests such as voting. (default 300)
+
+`DEBOUNCE_VIOLATION_THRESHOLD` - The number of debounce violations that need to be exceeded before a client is kicked from the server. This should be set low enough so as to prevent exploits, but high enough so as to not hurt users who simply click vote buttons repeatedly, for example. If set to 0, this feature will be disabled. (default 0)
