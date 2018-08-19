@@ -467,7 +467,7 @@ io.on('connection', (socket) => {
       });
 
       registerListener('create poll', (data, respond) => {
-        createPoll(data)
+        createPoll(data, CLIENT_IP)
           .then((poll) => {
             respond(true, {
               id: poll.id
