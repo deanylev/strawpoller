@@ -260,7 +260,7 @@ const createPoll = (data, ipAddress) => {
       id,
       created_at: Date.now(),
       updated_at: Date.now(),
-      ip_address: CLIENT_IP || ipAddress,
+      ip_address: ipAddress,
       topic,
       locked: data.unlock_at ? 1 : 0,
       one_vote_per_ip: data.one_vote_per_ip ? 1 : 0,
@@ -322,6 +322,7 @@ io.on('connection', (socket) => {
   const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const SOCKET_ID = socket.id;
   let CLIENT_ID = null;
+  let CLIENT = null;
   // wrap function to make code cleaner
   const getPollData = (id, unique, allFields) => {
     return pollData({
@@ -348,7 +349,7 @@ io.on('connection', (socket) => {
   const registerListener = (name, callback, once) => {
     LISTENERS.add(name);
     socket[once ? 'once' : 'on'](name, (data = {}, ack) => {
-      const client = CLIENTS.find((client) => client.id === CLIENT_ID) || {};
+      const client = CLIENT || {};
       if (once) {
         LISTENERS.delete(name);
       }
@@ -409,6 +410,9 @@ io.on('connection', (socket) => {
     });
 
     socket.disconnect();
+  };
+  const waitForThrottle = (callback) => {
+    setTimeout(callback, Math.max(0, CLIENT.throttledAt + THROTTLE_INTERVAL - Date.now()));
   };
 
   const sendPublicPolls = (target) => query('SELECT id, topic FROM polls WHERE public = 1 ORDER BY updated_at DESC')
@@ -473,12 +477,14 @@ io.on('connection', (socket) => {
         throttleViolations: 0
       });
 
+      CLIENT = CLIENTS.find((client) => client.id === CLIENT_ID);
+
       registerListener('create poll', (data, respond) => {
         createPoll(data, CLIENT_IP)
           .then((poll) => {
-            respond(true, {
+            waitForThrottle(() => respond(true, {
               id: poll.id
-            });
+            }));
 
             if (data.public) {
               sendPublicPolls('everyone');
@@ -636,7 +642,7 @@ io.on('connection', (socket) => {
                 // announce
                 sendFrame(data.id, 'poll data', pollData);
                 sendPublicPolls('everyone');
-                respond(true);
+                waitForThrottle(() => respond(true));
               });
           } else {
             respond(false, {
