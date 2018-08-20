@@ -469,15 +469,14 @@ io.on('connection', (socket) => {
       respond(true);
       sendPublicPolls(SOCKET_ID);
 
-
-      CLIENTS.push({
+      CLIENT = {
         id: CLIENT_ID,
         socketId: SOCKET_ID,
         throttledAt: 0,
         throttleViolations: 0
-      });
+      };
 
-      CLIENT = CLIENTS.find((client) => client.id === CLIENT_ID);
+      CLIENTS.push(CLIENT);
 
       registerListener('create poll', (data, respond) => {
         createPoll(data, CLIENT_IP)
