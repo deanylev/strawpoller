@@ -22,8 +22,8 @@ const {
   REJECTION_REASONS,
   MAXIMUM_UNLOCK_AT,
   ENABLE_API,
-  DEBOUNCE_INTERVAL,
-  DEBOUNCE_VIOLATION_THRESHOLD
+  THROTTLE_INTERVAL,
+  THROTTLE_VIOLATION_THRESHOLD
 } = require('./globals');
 
 // config
@@ -355,24 +355,24 @@ io.on('connection', (socket) => {
         });
         return;
       }
-      if (Date.now() - client.debouncedAt < DEBOUNCE_INTERVAL) {
+      if (Date.now() - client.throttledAt < THROTTLE_INTERVAL) {
         logger.warn('socket', 'dropping frame', {
           socketId: SOCKET_ID,
           name,
           data,
           ack,
-          reason: REJECTION_REASONS.debounced
+          reason: REJECTION_REASONS.throttled
         });
         ack(false);
-        if (DEBOUNCE_VIOLATION_THRESHOLD && ++client.debounceViolations >= DEBOUNCE_VIOLATION_THRESHOLD) {
-          kickClient('debounce violation threshold crossed');
+        if (THROTTLE_VIOLATION_THRESHOLD && ++client.throttleViolations >= THROTTLE_VIOLATION_THRESHOLD) {
+          kickClient('throttle violation threshold crossed');
         } else {
-          client.debouncedAt = Date.now();
+          client.throttledAt = Date.now();
         }
         return; 
       }
 
-      client.debouncedAt = Date.now();
+      client.throttledAt = Date.now();
 
       try {
         callback(data, (success, data) => {
@@ -462,8 +462,8 @@ io.on('connection', (socket) => {
       CLIENTS.push({
         id: CLIENT_ID,
         socketId: SOCKET_ID,
-        debouncedAt: 0,
-        debounceViolations: 0
+        throttledAt: 0,
+        throttleViolations: 0
       });
 
       registerListener('create poll', (data, respond) => {

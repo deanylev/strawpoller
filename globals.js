@@ -1,8 +1,8 @@
 const CONFIG_VARS = {
   PORT: 8080,
   QUERY_LIMIT: 1000,
-  DEBOUNCE_INTERVAL: 300,
-  DEBOUNCE_VIOLATION_THRESHOLD: 0,
+  THROTTLE_INTERVAL: 300,
+  THROTTLE_VIOLATION_THRESHOLD: 0,
   ENABLE_API: false,
   MASTER_PASS: null
 };
@@ -37,7 +37,7 @@ module.exports.REJECTION_REASONS = {
   auth: 'Unauthorised.',
   password: 'Password incorrect.',
   listener: 'No listener.',
-  debounced: 'Client debounced.'
+  throttled: 'Client throttled.'
 };
 
 module.exports.HANDSHAKE_WAIT_TIME = 10000;
