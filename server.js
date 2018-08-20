@@ -331,19 +331,20 @@ io.on('connection', (socket) => {
       clientId: CLIENT_ID
     }, unique, allFields);
   };
-  const sendFrame = (target, name, data) => {
+  const sendFrame = (target, name, data, excludeCurrent) => {
     logger.log('socket', 'sending frame', {
       target,
+      excludeCurrent,
       name,
       data
     });
 
     if (target === 'everyone') {
-      io.emit(name, data);
+      (excludeCurrent ? socket.broadcast : io).emit(name, data);
     } else if (target === SOCKET_ID) {
       socket.emit(name, data);
     } else {
-      io.to(target).emit(name, data);
+      (excludeCurrent ? socket.broadcast : io).to(target).emit(name, data);
     }
   };
   const registerListener = (name, callback, once) => {
@@ -752,7 +753,7 @@ io.on('connection', (socket) => {
           delete generalData.selected;
           const data = [generalData, fullData];
           // announce
-          [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', data[index]));
+          [pollId, poll.one_vote_per_ip ? CLIENT_IP : CLIENT_ID].forEach((target, index) => sendFrame(target, 'poll data', data[index], !index));
           respond(true);
         });
       });
