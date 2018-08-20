@@ -174,14 +174,13 @@ const TIMEOUTS = {};
 // keeps track of connected clients
 let CLIENTS = [];
 
-let CLIENT_IP = null;
-let CLIENT_ID = null;
 // promise which resolves with the topic, options and vote counts for a poll
-const getPollData = (id, unique, allFields) => {
+const pollData = (data, unique, allFields) => {
   const retOptions = [];
   const selected = [];
   let options = null;
   let poll = null;
+  const { id, clientIp, clientId } = data;
   return query('SELECT topic, locked, one_vote_per_ip, lock_changing, multiple_votes, public, allow_editing, unlock_at FROM polls WHERE id = ?', [id], true)
     .then((row) => {
       if (row) {
@@ -205,7 +204,7 @@ const getPollData = (id, unique, allFields) => {
       });
 
       if (unique) {
-        return query(`SELECT option_id FROM votes WHERE ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [CLIENT_IP, CLIENT_ID]);
+        return query(`SELECT option_id FROM votes WHERE ip_address = ? ${poll.one_vote_per_ip ? '' : 'AND client_id = ?'}`, [clientIp, clientId]);
       } else {
         return Promise.resolve();
       }
@@ -300,7 +299,7 @@ const schedulePollUnlock = (id, at) => {
         logger.log('server', 'automatically unlocked poll', {
           id
         });
-        getPollData(id).then((pollData) => io.to(id).emit('poll data', pollData));
+        pollData(id).then((pollData) => io.to(id).emit('poll data', pollData));
       }
     });
   }, at - Date.now());
@@ -320,9 +319,17 @@ query('SELECT id, unlock_at FROM polls WHERE unlock_at >= ?', [Date.now()]).then
 io.on('connection', (socket) => {
   const LISTENERS = new Set();
   // Cloudflare messes with the connecting IP
-  CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
+  const CLIENT_IP = socket.client.request.headers['cf-connecting-ip'] || socket.request.connection.remoteAddress;
   const SOCKET_ID = socket.id;
-  const CLIENT = null;
+  let CLIENT_ID = null;
+  // wrap function to make code cleaner
+  const getPollData = (id, unique, allFields) => {
+    return pollData({
+      id,
+      clientIp: CLIENT_IP,
+      clientId: CLIENT_ID
+    }, unique, allFields);
+  };
   const sendFrame = (target, name, data) => {
     logger.log('socket', 'sending frame', {
       target,
@@ -341,7 +348,7 @@ io.on('connection', (socket) => {
   const registerListener = (name, callback, once) => {
     LISTENERS.add(name);
     socket[once ? 'once' : 'on'](name, (data = {}, ack) => {
-      const client = name === 'handshake' ? {} : CLIENTS.find((client) => client.id === CLIENT_ID);
+      const client = CLIENTS.find((client) => client.id === CLIENT_ID) || {};
       if (once) {
         LISTENERS.delete(name);
       }
