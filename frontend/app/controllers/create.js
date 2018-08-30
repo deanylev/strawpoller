@@ -11,6 +11,8 @@ export default Ember.Controller.extend({
   minDate: new Date(),
   maxDate: new Date(Date.now() + 19 * ONE_DAY),
 
+  voteDisplay: 0,
+
   disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'editPassword', 'allowEditing', 'socket.connected', function() {
     // topic can't be blank
     return !(this.get('topic').trim()
@@ -80,6 +82,7 @@ export default Ember.Controller.extend({
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
         unlock_at: this.get('lockVoting') ? +this.get('unlockAt') : null,
+        vote_display: this.get('voteDisplay'),
         options: this.get('filteredOptions'),
       }).then((data) => this.get('router').transitionTo('view', data.id)).then(() => this.setDefaults());
     },
@@ -98,6 +101,10 @@ export default Ember.Controller.extend({
           this.removeOption(index);
         }
       }
+    },
+
+    updateVoteDisplay() {
+      this.set('voteDisplay', parseInt(event.target.value, 10));
     }
   }
 });

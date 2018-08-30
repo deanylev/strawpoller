@@ -96,6 +96,15 @@
       {{/liquid-if}}
     </div>
     <br>
+    <div class="form-group">
+      <label for="vote-display"><b>Vote Display Mode</b></label>
+      <select id="vote-display" class="custom-select" {{action "updateVoteDisplay" on="change"}}>
+        <option value="0">Always show votes</option>
+        <option value="1">Only show votes after voting</option>
+        <option value="2">Always hide votes</option>
+      </select>
+    </div>
+    <br>
     {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "savePoll") disabled=disabled}}Save{{/spin-button}}
     {{#spin-button class="btn btn-warning btn-block btn-lg" buttonStyle="zoom-out" action=(action "changeLocked") disabled=socket.disconnected}}{{if locked "Unlock" "Lock"}} Poll Voting{{/spin-button}}
     {{#spin-button class="btn btn-danger btn-block btn-lg" buttonStyle="zoom-out" action=(action "deletePoll") disabled=socket.disconnected}}Delete Poll{{/spin-button}}

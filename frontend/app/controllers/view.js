@@ -18,6 +18,10 @@ export default Ember.Controller.extend({
     return options;
   }),
 
+  hideVotes: Ember.computed('options.[]', 'options.@each.votes', function() {
+    return this.get('options').some((option) => typeof option.votes !== 'number');
+  }),
+
   inFlight: false,
 
   disabled: Ember.computed('inFlight', 'socket.disconnected', 'locked', 'lockChanging', 'selected', function() {

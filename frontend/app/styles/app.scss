@@ -30,3 +30,7 @@
   margin: 0 auto;
   @include ember-power-calendar($cell-size: 50px);
 }
+
+.custom-select {
+  background: #fff !important;
+}

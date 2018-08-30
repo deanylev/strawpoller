@@ -23,6 +23,7 @@ export default Ember.Controller.extend({
   editPassword: '',
   lockVoting: false,
   unlockAt: null,
+  voteDisplay: null,
   options: null,
 
   disabled: Ember.computed('topic', 'filteredOptions.[]', 'filteredOptions.@each.name', 'socket.connected', function() {
@@ -80,8 +81,13 @@ export default Ember.Controller.extend({
           allowEditing: data.allow_editing,
           lockVoting,
           unlockAt,
+          voteDisplay: data.vote_display,
           options: data.options,
           authenticated: true,
+        });
+
+        Ember.run.schedule('afterRender', this, () => {
+          $(`#vote-display option[value=${this.get('voteDisplay')}]`).attr('selected', true);
         });
       }).catch((err) => this.set('error', err.reason));
     },
@@ -111,6 +117,7 @@ export default Ember.Controller.extend({
         allow_editing: this.get('allowEditing'),
         edit_password: this.get('editPassword'),
         unlock_at: this.get('lockVoting') ? +this.get('unlockAt') : null,
+        vote_display: this.get('voteDisplay'),
         options: this.get('filteredOptions')
           .map((option, index) => Object.assign({
             position: index
@@ -130,6 +137,10 @@ export default Ember.Controller.extend({
       } else {
         return Ember.RSVP.reject();
       }
+    },
+
+    updateVoteDisplay() {
+      this.set('voteDisplay', parseInt(event.target.value, 10));
     }
   }
 });

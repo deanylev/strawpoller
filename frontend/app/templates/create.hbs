@@ -60,5 +60,14 @@
     {{/liquid-if}}
   </div>
   <br>
+  <div class="form-group">
+    <label for="vote-display"><b>Vote Display Mode</b></label>
+    <select id="vote-display" class="custom-select" {{action "updateVoteDisplay" on="change"}}>
+      <option value="0" selected>Always show votes</option>
+      <option value="1">Only show votes after voting</option>
+      <option value="2">Always hide votes</option>
+    </select>
+  </div>
+  <br>
   {{#spin-button class="btn btn-success btn-block btn-lg" buttonStyle="zoom-out" action=(action "createPoll") disabled=disabled}}Create{{/spin-button}}
 </form>

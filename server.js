@@ -141,6 +141,10 @@ createTable('polls', [
     name: 'unlock_at',
     type: 'bigint(13)',
     allowNull: true
+  },
+  {
+    name: 'vote_display',
+    type: 'smallint(1)'
   }
 ]);
 
@@ -181,7 +185,7 @@ const pollData = (data, unique, allFields) => {
   let options = null;
   let poll = null;
   const { id, clientIp, clientId } = data;
-  return query('SELECT topic, locked, one_vote_per_ip, lock_changing, multiple_votes, public, allow_editing, unlock_at FROM polls WHERE id = ?', [id], true)
+  return query('SELECT topic, locked, one_vote_per_ip, lock_changing, multiple_votes, public, allow_editing, unlock_at, vote_display FROM polls WHERE id = ?', [id], true)
     .then((row) => {
       if (row) {
         poll = row;
@@ -218,6 +222,10 @@ const pollData = (data, unique, allFields) => {
         });
       }
 
+      if (poll.vote_display === 1 && unique && !selected.length || poll.vote_display === 2) {
+        retOptions.forEach((option) => option.votes = null);
+      }
+
       const obj = {
         id,
         topic: poll.topic,
@@ -227,6 +235,7 @@ const pollData = (data, unique, allFields) => {
         public: !!poll.public,
         allow_editing: !!poll.allow_editing,
         unlock_at: poll.unlock_at,
+        vote_display: poll.vote_display,
         options: allFields ? retOptions.map((option) => Object.assign(option, {
           max: option.votes + QUERY_LIMIT
         })) : retOptions
@@ -269,7 +278,8 @@ const createPoll = (data, ipAddress) => {
       public: data.public ? 1 : 0,
       allow_editing: data.allow_editing ? 1 : 0,
       edit_password: passwordHash.generate(data.edit_password || uuidv4()),
-      unlock_at: data.unlock_at ? unlockAt : null
+      unlock_at: data.unlock_at ? unlockAt : null,
+      vote_display: typeof data.vote_display === 'number' && !isNaN(data.vote_display) && data.vote_display >= 0 && data.vote_display <= 2 ? data.vote_display : 0
     }).then(() => Promise.all(options.map((option, position) => query('INSERT INTO options SET ?', {
       id: uuidv4(),
       created_at: Date.now(),
@@ -378,7 +388,7 @@ io.on('connection', (socket) => {
         } else {
           client.throttledAt = Date.now();
         }
-        return; 
+        return;
       }
 
       client.throttledAt = Date.now();
@@ -489,7 +499,7 @@ io.on('connection', (socket) => {
             if (data.public) {
               sendPublicPolls('everyone');
             }
-  
+
             if (data.unlock_at) {
               schedulePollUnlock(poll.id, poll.unlockAt);
             }
@@ -559,7 +569,8 @@ io.on('connection', (socket) => {
               lock_changing: data.lock_changing ? 1 : 0,
               multiple_votes: data.multiple_votes ? 1 : 0,
               public: data.public ? 1 : 0,
-              unlock_at: data.unlock_at ? unlockAt : null
+              unlock_at: data.unlock_at ? unlockAt : null,
+              vote_display: typeof data.vote_display === 'number' && !isNaN(data.vote_display) && data.vote_display >= 0 && data.vote_display <= 2 ? data.vote_display : 0
             };
             // only allow admins to change certain props
             if (AUTHENTICATED[SOCKET_ID].admin) {
@@ -788,13 +799,13 @@ if (ENABLE_API) {
   const apiV1 = express.Router();
   apiV1.all('*', cors());
   app.use('/api/v1', apiV1);
-  
+
   apiV1.get('/polls/:id', (req, res) => {
     getPollData(req.params.id)
       .then((pollData) => res.json(pollData))
       .catch(() => res.sendStatus(404));
   });
-  
+
   apiV1.post('/polls', (req, res) => {
     createPoll(req.body, getIp(req))
       .then((poll) => getPollData(poll.id))
