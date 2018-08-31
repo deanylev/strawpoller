@@ -801,7 +801,7 @@ if (ENABLE_API) {
   app.use('/api/v1', apiV1);
 
   apiV1.get('/polls/:id', (req, res) => {
-    getPollData(req.params.id)
+    pollData(req.params)
       .then((pollData) => res.json(pollData))
       .catch(() => res.sendStatus(404));
   });
