@@ -222,7 +222,7 @@ const pollData = (data, unique, allFields) => {
         });
       }
 
-      if (poll.vote_display === 1 && unique && !selected.length || poll.vote_display === 2) {
+      if (!allFields && (poll.vote_display === 1 && unique && !selected.length || poll.vote_display === 2)) {
         retOptions.forEach((option) => option.votes = null);
       }
 
