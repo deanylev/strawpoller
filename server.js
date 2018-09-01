@@ -51,6 +51,8 @@ const query = (query, values, singleRow) => {
   });
 };
 
+const getIp = (req) => req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({
@@ -59,7 +61,7 @@ app.use(bodyParser.urlencoded({
 
 app.use((req, res, next) => {
   logger.log('router', 'request',  Object.assign(_.pick(req, 'method', 'url', 'body'), {
-    ip: req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.connection.remoteAddress
+    ip: getIp(req)
   }));
   next();
 });
