@@ -34,3 +34,13 @@
 .custom-select {
   background: #fff !important;
 }
+
+.vote-button {
+  &.no-votes {
+    padding: 20px 0;
+  }
+
+  h5 {
+    margin-bottom: 0;
+  }
+}
