@@ -16,13 +16,13 @@ You must have Node.js and Yarn installed (preferably the latest version).
 
 When running in development mode, the frontend assumes the backend is running on port 8080. You can change this by setting the `SERVER_PORT` env variable.
 
-1. Run `yarn` once from `/frontend` to set up dependencies.
-2. Run `ember s` from `/frontend`.
+1. Run `yarn` once from `frontend` to set up dependencies.
+2. Run `ember s` from `frontend`.
 3. Access the frontend at `http://localhost:4200`.
 
 ### Building the frontend
 
-Run `/build_frontend.sh`. It will build the frontend and move the generated files to the correct places.
+Run `make compile` in the root of the repo. It will build the frontend and move the generated files to the correct places.
 
 ### Environment Variables
 
