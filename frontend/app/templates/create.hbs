@@ -4,7 +4,9 @@
   <br>
   <div class="form-group">
     <label class="bold" for="topic">Topic</label>
-    {{input id="topic" class="form-control" type="text" value=topic}}
+    {{#auto-focus}}
+      {{input id="topic" class="form-control" type="text" value=topic}}
+    {{/auto-focus}}
   </div>
   <br>
   {{#if options}}
