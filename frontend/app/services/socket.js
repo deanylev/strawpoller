@@ -10,6 +10,7 @@ export default Ember.Service.extend({
   socket: null,
   connected: false,
   disconnected: Ember.computed.not('connected'),
+  reconnecting: false,
   isHandshook: false,
 
   publicPolls: null,
@@ -21,6 +22,11 @@ export default Ember.Service.extend({
     if (connected) {
       this._getClientId().then((clientId) => this.handshake(clientId)).then(() => this.set('isHandshook', true));
     }
+  }),
+
+  attempts: 0,
+  attemptType: Ember.computed('isHandshook', function() {
+    return this.get('isHandshook') ? 'reconnect' : 'connect';
   }),
 
   init() {
@@ -41,6 +47,19 @@ export default Ember.Service.extend({
 
     this.registerListener('connect', () => this.set('connected', true));
     this.registerListener('disconnect', () => this.set('connected', false));
+    this.registerListener('reconnect_attempt', () => {
+      this.incrementProperty('attempts');
+      this.set('reconnecting', true);
+      this.get('logger').log('socket', `attempting to ${this.get('attemptType')}...`, {
+        attempts: this.get('attempts')
+      });
+    });
+    this.registerListener('reconnect_error', () => this.get('logger').warn('socket', `${this.get('attemptType')}ion attempt failed`));
+    this.registerListener('reconnect', () => {
+      this.set('reconnecting', false);
+      this.set('attempts', 0);
+      this.get('logger').log('socket', `successful attempt to ${this.get('attemptType')}`);
+    });
 
     this.registerListener('public polls', (publicPolls) => this.setProperties({
       publicPolls
@@ -51,8 +70,10 @@ export default Ember.Service.extend({
     return new Ember.RSVP.Promise((resolve, reject) => {
       const { clientId } = localStorage;
       if (clientId && clientId.length === 32) {
+        this.get('logger').log('socket', 'using existing client id');
         resolve(clientId);
       } else {
+        this.get('logger').log('socket', 'generating new client id');
         new Fingerprint2().get((newClientId) => {
           localStorage.setItem('clientId', newClientId);
           resolve(newClientId);

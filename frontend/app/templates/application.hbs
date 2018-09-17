@@ -28,10 +28,10 @@
 <br>
 <div class="container bg-light text-center">
   <br>
-  {{#if socket.isHandshook}}
+  {{#if socket.connected}}
     {{outlet}}
   {{else}}
-    <h2 class="text-center">Connecting...</h2>
+    <h2>{{title-case socket.attemptType}}ing...</h2>
   {{/if}}
   <br>
 </div>
